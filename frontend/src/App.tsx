@@ -15,11 +15,7 @@ const generateBlurredThumbnail = (file: File): Promise<string> => {
       const video = document.createElement('video');
       video.src = URL.createObjectURL(file);
       video.muted = true;
-      
-      video.onloadeddata = () => {
-        video.currentTime = Math.min(1, video.duration / 2) || 0; 
-      };
-      
+      video.onloadeddata = () => { video.currentTime = Math.min(1, video.duration / 2) || 0; };
       video.onseeked = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -33,8 +29,7 @@ const generateBlurredThumbnail = (file: File): Promise<string> => {
         resolve(canvas.toDataURL('image/jpeg', 0.3));
       };
       video.onerror = () => resolve(''); 
-    } 
-    else {
+    } else {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
@@ -184,6 +179,67 @@ function App() {
     }
   };
 
+  const handleDelete = async (filename: string) => {
+    const isConfirm = window.confirm("Bạn có chắc chắn muốn xóa file này vĩnh viễn không?");
+    if (!isConfirm) return;
+
+    setStatus(`Đang xóa file...`);
+    try {
+      const response = await fetch(`http://localhost:8000/delete/${filename}`, { method: 'DELETE' });
+      if (response.ok) {
+        setImages(prevImages => prevImages.filter(img => img.filename !== filename));
+        setStatus("✅ Đã xóa file thành công!");
+      } else setStatus("❌ Lỗi khi xóa file!");
+    } catch (error) {
+      setStatus("❌ Lỗi kết nối mạng khi xóa!");
+    }
+  };
+
+  // --- HÀM MỚI: ĐỔI MẬT KHẨU BẰNG CÁCH "VE SẦU THOÁT XÁC" ---
+  const handleChangePassword = async (item: SecureImage) => {
+    if (!item.src) return; // Phải giải mã hiển thị ảnh ra rồi mới được đổi
+    
+    const newPassword = window.prompt("Nhập MẬT KHẨU CẤP 2 MỚI cho file này:");
+    if (!newPassword) return; // Nếu bấm Hủy hoặc để trống thì thôi
+
+    setStatus("Đang thực hiện đổi mật khẩu ngầm...");
+    try {
+      // 1. Dùng Fetch để biến file đang hiển thị trên Web ngược lại thành File Object
+      const response = await fetch(item.src);
+      const blob = await response.blob();
+      const fileObj = new File([blob], `recovered_${item.filename}`, { type: blob.type });
+
+      // 2. Băm nát lại file bằng MẬT KHẨU MỚI
+      const encryptedBlob = await encryptFile(fileObj, newPassword);
+
+      // 3. Tạo lại ảnh mờ bằng Master Key
+      const thumbBase64 = await generateBlurredThumbnail(fileObj);
+      const encryptedThumb = CryptoJS.AES.encrypt(thumbBase64, masterKey).toString();
+
+      // 4. Tạo file mới trên Supabase
+      const formData = new FormData();
+      formData.append('file', encryptedBlob, 'encrypted.txt');
+      formData.append('is_private', 'true');
+      formData.append('thumbnail', encryptedThumb);
+
+      const uploadRes = await fetch('http://localhost:8000/upload', {
+        method: 'POST', body: formData,
+      });
+
+      if (!uploadRes.ok) throw new Error("Lỗi khi tải lên");
+
+      // 5. Tiêu hủy file cũ bị lộ mật khẩu
+      await fetch(`http://localhost:8000/delete/${item.filename}`, {
+        method: 'DELETE',
+      });
+
+      setStatus("✅ Đã đổi mật khẩu cấp 2 thành công!");
+      handleUnlockMaster(); // Load lại thư viện để làm mới giao diện
+    } catch (error) {
+      setStatus("❌ Lỗi quá trình đổi mật khẩu!");
+    }
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '900px', margin: '0 auto' }}>
       <h1 style={{ textAlign: 'center', color: '#333' }}>Két Sắt Đa Phương Tiện</h1>
@@ -225,6 +281,22 @@ function App() {
             {images.map((item, index) => (
               <div key={index} style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden', height: '250px', position: 'relative', backgroundColor: '#000' }}>
                 
+                {/* --- NÚT XÓA Ở GÓC PHẢI TRÊN CÙNG --- */}
+                <button
+                  onClick={() => handleDelete(item.filename)}
+                  style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(220, 53, 69, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Xóa vĩnh viễn"
+                >✕</button>
+
+                {/* --- NÚT ĐỔI MẬT KHẨU GÓC TRÁI (Chỉ hiện khi Ảnh cấp 2 ĐÃ MỞ) --- */}
+                {item.src && item.is_private && (
+                  <button
+                    onClick={() => handleChangePassword(item)}
+                    style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: 'rgba(0, 123, 255, 0.9)', color: 'white', border: 'none', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', zIndex: 10, fontWeight: 'bold', fontSize: '12px' }}
+                    title="Đổi mật khẩu cấp 2"
+                  >🔑 Đổi Pass</button>
+                )}
+
                 {/* 1. KHI FILE ĐANG BỊ KHÓA */}
                 {!item.src && item.is_private && (
                   <>
