@@ -1,56 +1,9 @@
 import { useState } from 'react';
 import CryptoJS from 'crypto-js';
 import { encryptFile, decryptFile } from './utils/cryptoService';
-
-interface SecureImage {
-  filename: string;
-  src: string | null;      
-  thumb: string | null;    
-  is_private: boolean;
-}
-
-const generateBlurredThumbnail = (file: File): Promise<string> => {
-  return new Promise((resolve) => {
-    if (file.type.startsWith('video/')) {
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(file);
-      video.muted = true;
-      video.onloadeddata = () => { video.currentTime = Math.min(1, video.duration / 2) || 0; };
-      video.onseeked = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const scaleSize = 50 / (video.videoWidth || 100);
-        canvas.width = 50;
-        canvas.height = (video.videoHeight || 100) * scaleSize;
-        if(ctx) {
-          ctx.filter = 'blur(2px)';
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        }
-        resolve(canvas.toDataURL('image/jpeg', 0.3));
-      };
-      video.onerror = () => resolve(''); 
-    } else {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const scaleSize = 50 / img.width;
-          canvas.width = 50;
-          canvas.height = img.height * scaleSize;
-          if(ctx) {
-            ctx.filter = 'blur(2px)';
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          }
-          resolve(canvas.toDataURL('image/jpeg', 0.3));
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-};
+import { generateBlurredThumbnail } from './utils/mediaHelper';
+import MediaCard from './components/MediaCard';
+import type { SecureImage } from './types';
 
 function App() {
   const [masterKey, setMasterKey] = useState<string>('');
@@ -61,8 +14,6 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploadPrivate, setIsUploadPrivate] = useState<boolean>(false);
   const [uploadLevel2Key, setUploadLevel2Key] = useState<string>('');
-
-  const [privateInputs, setPrivateInputs] = useState<Record<string, string>>({});
 
   const handleUnlockMaster = async () => {
     if (!masterKey) return alert("Vui lòng nhập Master Key!");
@@ -126,15 +77,12 @@ function App() {
     try {
       setStatus("Đang mã hóa...");
       const keyToUse = isUploadPrivate ? uploadLevel2Key : masterKey;
-      
       const encryptedBlob = await encryptFile(file, keyToUse);
       
       let encryptedThumb = '';
       if (isUploadPrivate) {
         const thumbBase64 = await generateBlurredThumbnail(file);
-        if (thumbBase64) {
-           encryptedThumb = CryptoJS.AES.encrypt(thumbBase64, masterKey).toString();
-        }
+        if (thumbBase64) encryptedThumb = CryptoJS.AES.encrypt(thumbBase64, masterKey).toString();
       }
       
       const formData = new FormData();
@@ -142,9 +90,7 @@ function App() {
       formData.append('is_private', isUploadPrivate ? 'true' : 'false');
       formData.append('thumbnail', encryptedThumb);
 
-      const response = await fetch('http://localhost:8000/upload', {
-        method: 'POST', body: formData,
-      });
+      const response = await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
 
       if (response.ok) {
         setStatus("✅ Đã cất an toàn!");
@@ -157,10 +103,8 @@ function App() {
     }
   };
 
-  const handleUnlockSinglePrivate = async (filename: string) => {
-    const specificKey = privateInputs[filename];
+  const handleUnlockSinglePrivate = async (filename: string, specificKey: string) => {
     if (!specificKey) return alert("Vui lòng nhập mật khẩu!");
-
     setStatus(`Đang giải mã...`);
     try {
       const fileRes = await fetch(`http://localhost:8000/download/${filename}`);
@@ -169,9 +113,7 @@ function App() {
       const blob = await fileRes.blob();
       const base64Data = await decryptFile(blob, specificKey);
 
-      setImages(prevImages => prevImages.map(img => 
-        img.filename === filename ? { ...img, src: base64Data } : img
-      ));
+      setImages(prevImages => prevImages.map(img => img.filename === filename ? { ...img, src: base64Data } : img));
       setStatus("✅ Mở khóa thành công!");
     } catch (error) {
       alert("Sai mật khẩu cấp 2!");
@@ -195,46 +137,33 @@ function App() {
     }
   };
 
-  // --- HÀM MỚI: ĐỔI MẬT KHẨU BẰNG CÁCH "VE SẦU THOÁT XÁC" ---
   const handleChangePassword = async (item: SecureImage) => {
-    if (!item.src) return; // Phải giải mã hiển thị ảnh ra rồi mới được đổi
-    
+    if (!item.src) return; 
     const newPassword = window.prompt("Nhập MẬT KHẨU CẤP 2 MỚI cho file này:");
-    if (!newPassword) return; // Nếu bấm Hủy hoặc để trống thì thôi
+    if (!newPassword) return; 
 
     setStatus("Đang thực hiện đổi mật khẩu ngầm...");
     try {
-      // 1. Dùng Fetch để biến file đang hiển thị trên Web ngược lại thành File Object
       const response = await fetch(item.src);
       const blob = await response.blob();
       const fileObj = new File([blob], `recovered_${item.filename}`, { type: blob.type });
 
-      // 2. Băm nát lại file bằng MẬT KHẨU MỚI
       const encryptedBlob = await encryptFile(fileObj, newPassword);
-
-      // 3. Tạo lại ảnh mờ bằng Master Key
       const thumbBase64 = await generateBlurredThumbnail(fileObj);
       const encryptedThumb = CryptoJS.AES.encrypt(thumbBase64, masterKey).toString();
 
-      // 4. Tạo file mới trên Supabase
       const formData = new FormData();
       formData.append('file', encryptedBlob, 'encrypted.txt');
       formData.append('is_private', 'true');
       formData.append('thumbnail', encryptedThumb);
 
-      const uploadRes = await fetch('http://localhost:8000/upload', {
-        method: 'POST', body: formData,
-      });
-
+      const uploadRes = await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
       if (!uploadRes.ok) throw new Error("Lỗi khi tải lên");
 
-      // 5. Tiêu hủy file cũ bị lộ mật khẩu
-      await fetch(`http://localhost:8000/delete/${item.filename}`, {
-        method: 'DELETE',
-      });
+      await fetch(`http://localhost:8000/delete/${item.filename}`, { method: 'DELETE' });
 
       setStatus("✅ Đã đổi mật khẩu cấp 2 thành công!");
-      handleUnlockMaster(); // Load lại thư viện để làm mới giao diện
+      handleUnlockMaster();
     } catch (error) {
       setStatus("❌ Lỗi quá trình đổi mật khẩu!");
     }
@@ -248,9 +177,7 @@ function App() {
         <div style={{ border: '2px solid #ccc', padding: '30px', borderRadius: '10px', textAlign: 'center', maxWidth: '400px', margin: '50px auto' }}>
           <h2>🔒 Lớp Ngoài</h2>
           <input type="password" placeholder="Nhập Master Key" value={masterKey} onChange={(e) => setMasterKey(e.target.value)} style={{ padding: '10px', width: '90%', marginBottom: '20px' }} />
-          <button onClick={handleUnlockMaster} style={{ padding: '12px 24px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '95%' }}>
-            Truy Cập Thư Viện
-          </button>
+          <button onClick={handleUnlockMaster} style={{ padding: '12px 24px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '95%' }}>Truy Cập Thư Viện</button>
           <p style={{ color: 'red', fontWeight: 'bold' }}>{status}</p>
         </div>
       ) : (
@@ -263,77 +190,27 @@ function App() {
           <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
             <strong>Cất thêm File (Ảnh/Video): </strong>
             <input type="file" accept="image/*,video/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-            
             <div style={{ margin: '10px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input type="checkbox" id="priv" checked={isUploadPrivate} onChange={(e) => setIsUploadPrivate(e.target.checked)} />
               <label htmlFor="priv" style={{ color: '#d9534f', fontWeight: 'bold' }}>File Tuyệt Mật</label>
             </div>
-            
             {isUploadPrivate && (
               <input type="password" placeholder="Nhập mật khẩu khóa file này..." value={uploadLevel2Key} onChange={(e) => setUploadLevel2Key(e.target.value)} style={{ padding: '8px', width: '100%', marginBottom: '10px', boxSizing: 'border-box' }} />
             )}
-            
             <button onClick={handleUpload} style={{ padding: '8px 16px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Mã Hóa & Cất Giấu</button>
             <p style={{ color: 'blue', fontSize: '14px' }}>{status}</p>
           </div>
 
+          {/* SỬ DỤNG COMPONENT MEDIA CARD ĐÃ TÁCH */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
             {images.map((item, index) => (
-              <div key={index} style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden', height: '250px', position: 'relative', backgroundColor: '#000' }}>
-                
-                {/* --- NÚT XÓA Ở GÓC PHẢI TRÊN CÙNG --- */}
-                <button
-                  onClick={() => handleDelete(item.filename)}
-                  style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(220, 53, 69, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  title="Xóa vĩnh viễn"
-                >✕</button>
-
-                {/* --- NÚT ĐỔI MẬT KHẨU GÓC TRÁI (Chỉ hiện khi Ảnh cấp 2 ĐÃ MỞ) --- */}
-                {item.src && item.is_private && (
-                  <button
-                    onClick={() => handleChangePassword(item)}
-                    style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: 'rgba(0, 123, 255, 0.9)', color: 'white', border: 'none', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', zIndex: 10, fontWeight: 'bold', fontSize: '12px' }}
-                    title="Đổi mật khẩu cấp 2"
-                  >🔑 Đổi Pass</button>
-                )}
-
-                {/* 1. KHI FILE ĐANG BỊ KHÓA */}
-                {!item.src && item.is_private && (
-                  <>
-                    {item.thumb && (
-                      <img src={item.thumb} alt="blurred" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(10px)', transform: 'scale(1.1)', opacity: 0.6, position: 'absolute', top: 0, left: 0 }} />
-                    )}
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: '10px' }}>
-                      <span style={{ fontSize: '40px' }}>🔒</span>
-                      <p style={{ margin: '5px 0 15px 0', fontSize: '14px', color: '#fff', fontWeight: 'bold' }}>Cần Mật Khẩu</p>
-                      
-                      <input 
-                        type="password" 
-                        placeholder="Mật khẩu riêng" 
-                        value={privateInputs[item.filename] || ''} 
-                        onChange={(e) => setPrivateInputs({...privateInputs, [item.filename]: e.target.value})}
-                        style={{ padding: '8px', width: '90%', marginBottom: '10px', boxSizing: 'border-box', textAlign: 'center', borderRadius: '4px', border: 'none' }} 
-                      />
-                      
-                      <button 
-                        onClick={() => handleUnlockSinglePrivate(item.filename)}
-                        style={{ padding: '8px 12px', backgroundColor: '#d9534f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', width: '90%', fontWeight: 'bold' }}
-                      >
-                        Mở Khóa
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {/* 2. KHI FILE ĐÃ ĐƯỢC GIẢI MÃ */}
-                {item.src && (
-                  item.src.startsWith('data:video') ? (
-                    <video src={item.src} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <img src={item.src} alt={`secure-media-${index}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  )
-                )}
-              </div>
+              <MediaCard 
+                key={index}
+                item={item}
+                onUnlock={handleUnlockSinglePrivate}
+                onDelete={handleDelete}
+                onChangePassword={handleChangePassword}
+              />
             ))}
           </div>
         </div>
