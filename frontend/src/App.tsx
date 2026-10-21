@@ -4,6 +4,7 @@ import { encryptFile, decryptFile } from './utils/cryptoService';
 import { generateBlurredThumbnail } from './utils/mediaHelper';
 import MediaCard from './components/MediaCard';
 import type { SecureImage } from './types';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
 // Từ điển sinh từ ngẫu nhiên
 const WORD_LIST = ["apple", "bear", "cat", "dog", "eagle", "fire", "gold", "hero", "iron", "jump", "king", "lion", "moon", "nest", "ocean", "pine", "queen", "rose", "star", "tree", "unit", "vine", "wolf", "xray", "yarn", "zero", "sun", "sky", "sea", "wind", "rain"];
@@ -41,16 +42,19 @@ function App() {
     setSeedWords(newArr);
   };
 
-  const handleUnlockMaster = async () => {
-    if (seedWords.some(w => w === '')) return alert("Vui lòng nhập đủ 5 từ khóa!");
+  // NÂNG CẤP: Nhận thêm tham số overrideKey để hỗ trợ FaceID tự động mở khóa
+  const handleUnlockMaster = async (overrideKey?: string | React.MouseEvent) => {
+    const isAutoLogin = typeof overrideKey === 'string';
+    const activeKey = isAutoLogin ? overrideKey : masterKeyString;
+
+    if (!isAutoLogin && seedWords.some(w => w === '')) return alert("Vui lòng nhập đủ 5 từ khóa!");
+    
     setStatus("Đang tải thư viện...");
     setImages([]);
     
     try {
-      // --- NÂNG CẤP: BĂM 5 TỪ THÀNH ĐỊA CHỈ VÍ ---
-      const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
+      const walletAddress = CryptoJS.SHA256(activeKey).toString();
       
-      // GỬI ĐỊA CHỈ VÍ LÊN SERVER ĐỂ TÌM ĐÚNG FILE
       const res = await fetch(`http://localhost:8000/photos?wallet_address=${walletAddress}`);
       const data = await res.json();
       const dbPhotos: {filename: string, is_private: boolean, thumbnail: string}[] = data.photos;
@@ -69,7 +73,7 @@ function App() {
           let decryptedThumb = null;
           if (item.thumbnail) {
             try {
-              const bytes = CryptoJS.AES.decrypt(item.thumbnail, masterKeyString);
+              const bytes = CryptoJS.AES.decrypt(item.thumbnail, activeKey);
               decryptedThumb = bytes.toString(CryptoJS.enc.Utf8);
             } catch(e) {}
           }
@@ -79,7 +83,7 @@ function App() {
             const fileRes = await fetch(`http://localhost:8000/download/${item.filename}`);
             if (fileRes.ok) {
               const blob = await fileRes.blob();
-              const base64Data = await decryptFile(blob, masterKeyString);
+              const base64Data = await decryptFile(blob, activeKey);
               processedImages.push({ filename: item.filename, src: base64Data, thumb: null, is_private: false });
               successCount++;
             }
@@ -100,6 +104,88 @@ function App() {
     }
   };
 
+  // ==========================================
+  // API WEBAUTHN / FIDO2 (QUÉT KHUÔN MẶT)
+  // ==========================================
+  const handleRegisterFaceID = async () => {
+    setStatus("Đang bật Camera/Cảm biến sinh trắc học...");
+    try {
+      const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
+      
+      // 1. Xin máy chủ bài test nhận diện
+      const resOpt = await fetch('http://localhost:8000/webauthn/register/generate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ wallet_address: walletAddress })
+      });
+      const options = await resOpt.json();
+
+      // 2. Kích hoạt phần cứng thiết bị (FaceID / Windows Hello)
+      const attResp = await startRegistration(options);
+
+      // 3. Gửi chữ ký lên máy chủ
+      const resVerify = await fetch('http://localhost:8000/webauthn/register/verify', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ wallet_address: walletAddress, credential: attResp })
+      });
+
+      if (resVerify.ok) {
+        // Lưu lại Key để lần sau mở khóa không cần gõ 5 từ
+        localStorage.setItem(`vault_key_${walletAddress}`, masterKeyString);
+        localStorage.setItem(`last_wallet_address`, walletAddress);
+        setStatus("✅ Đã liên kết sinh trắc học thiết bị này!");
+      }
+    } catch (error) {
+      setStatus("❌ Lỗi thiết lập sinh trắc học hoặc đã hủy.");
+    }
+  };
+
+  const handleLoginWithFaceID = async () => {
+    setStatus("Đang kích hoạt nhận diện khuôn mặt...");
+    try {
+      // Lấy địa chỉ ví sử dụng gần nhất trên trình duyệt này
+      const walletAddress = localStorage.getItem('last_wallet_address');
+      if (!walletAddress) {
+        setStatus("❌ Thiết bị này chưa liên kết với Két sắt nào. Hãy đăng nhập bằng 5 từ khóa và liên kết!");
+        return;
+      }
+
+      // 1. Xin máy chủ bài test đăng nhập
+      const resOpt = await fetch('http://localhost:8000/webauthn/auth/generate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ wallet_address: walletAddress })
+      });
+      const options = await resOpt.json();
+
+      // 2. Bật Camera / Cảm biến vân tay
+      const asseResp = await startAuthentication(options);
+
+      // 3. Máy chủ xác minh chữ ký phần cứng
+      const resVerify = await fetch('http://localhost:8000/webauthn/auth/verify', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ wallet_address: walletAddress, credential: asseResp })
+      });
+
+      if (resVerify.ok) {
+        // Rút Key từ kho bí mật của trình duyệt
+        const savedKey = localStorage.getItem(`vault_key_${walletAddress}`);
+        if (savedKey) {
+           // Tự động điền 5 từ vào giao diện
+           setSeedWords(savedKey.split(' '));
+           // Mở khóa Két luôn
+           await handleUnlockMaster(savedKey); 
+           setStatus("✅ Đăng nhập sinh trắc học thành công!");
+        } else {
+           setStatus("❌ Dữ liệu khôi phục bị mất, vui lòng đăng nhập bằng tay.");
+        }
+      } else {
+        setStatus("❌ Xác thực chữ ký máy chủ thất bại.");
+      }
+    } catch (error) {
+      setStatus("❌ Xác thực sinh trắc học thất bại hoặc đã hủy.");
+    }
+  };
+  // ==========================================
+
   const handleUpload = async () => {
     if (!file) return alert("Vui lòng chọn file!");
     if (isUploadPrivate && !uploadLevel2Key) return alert("Vui lòng nhập mật khẩu tuyệt mật!");
@@ -107,8 +193,6 @@ function App() {
     try {
       setStatus("Đang mã hóa...");
       const keyToUse = isUploadPrivate ? uploadLevel2Key : masterKeyString;
-      
-      // --- NÂNG CẤP: TÍNH ĐỊA CHỈ VÍ ---
       const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
       
       const encryptedBlob = await encryptFile(file, keyToUse);
@@ -123,7 +207,7 @@ function App() {
       formData.append('file', encryptedBlob, 'encrypted.txt');
       formData.append('is_private', isUploadPrivate ? 'true' : 'false');
       formData.append('thumbnail', encryptedThumb);
-      formData.append('wallet_address', walletAddress); // --- GẮN MÁC CHỦ SỞ HỮU KHI UPLOAD ---
+      formData.append('wallet_address', walletAddress); 
 
       const response = await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
 
@@ -154,32 +238,26 @@ function App() {
   };
 
   const handleDelete = async (filename: string) => {
-    // 1. Tìm thông tin của file mà người dùng đang muốn xóa
     const item = images.find(img => img.filename === filename);
     if (!item) return;
 
-    // 2. NẾU LÀ FILE TUYỆT MẬT -> Ép nhập mật khẩu riêng để xác thực
     if (item.is_private) {
       const filePass = window.prompt("🔒 KHÓA BẢO VỆ\nFile này là TUYỆT MẬT. Bạn phải nhập chính xác MẬT KHẨU RIÊNG của file này để được phép tiêu hủy:");
       if (!filePass) return;
 
       setStatus(`Đang xác thực mật khẩu riêng...`);
       try {
-        // Tải file mã hóa về và giải mã thử
         const fileRes = await fetch(`http://localhost:8000/download/${filename}`);
         if (!fileRes.ok) throw new Error();
         const blob = await fileRes.blob();
-        
-        // Cốt lõi bảo mật: Nếu pass sai, hàm decryptFile sẽ văng lỗi và nhảy ngay xuống catch
         await decryptFile(blob, filePass); 
       } catch (error) {
         alert("❌ Sai mật khẩu riêng! Két sắt từ chối yêu cầu tiêu hủy.");
         setStatus("❌ Xóa thất bại do sai mật khẩu file.");
-        return; // Chặn đứng việc xóa tại đây
+        return; 
       }
     }
 
-    // 3. Nếu là file Public (hoặc file Private ĐÃ nhập đúng pass ở trên) -> Hỏi pass Hệ thống
     const pass = window.prompt("⚠️ CẢNH BÁO BẢO MẬT\nNhập MẬT KHẨU XÓA HỆ THỐNG:");
     if (!pass) return;
     
@@ -208,8 +286,6 @@ function App() {
 
       const isMakingPrivate = newPassword !== undefined;
       const keyToUse = isMakingPrivate ? newPassword : masterKeyString;
-
-      // --- NÂNG CẤP: TÍNH ĐỊA CHỈ VÍ ---
       const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
 
       const encryptedBlob = await encryptFile(fileObj, keyToUse);
@@ -223,7 +299,7 @@ function App() {
       formData.append('file', encryptedBlob, 'encrypted.txt');
       formData.append('is_private', isMakingPrivate ? 'true' : 'false');
       formData.append('thumbnail', encryptedThumb);
-      formData.append('wallet_address', walletAddress); // --- GẮN MÁC CHỦ SỞ HỮU KHI ĐỔI TRẠNG THÁI ---
+      formData.append('wallet_address', walletAddress); 
 
       await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
       
@@ -271,15 +347,29 @@ function App() {
           </div>
 
           <button onClick={handleUnlockMaster} style={{ padding: '12px 24px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%', fontWeight: 'bold' }}>
-            Truy Cập Ví
+            🔑 Truy Cập Ví (Bằng 5 Từ Khóa)
           </button>
+
+          <hr style={{ margin: '20px 0', borderTop: '1px dashed #ccc' }} />
+
+          <button onClick={handleLoginWithFaceID} style={{ padding: '12px 24px', backgroundColor: '#000', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%', fontWeight: 'bold' }}>
+            📷 Mở Khóa Nhanh Bằng Sinh Trắc Học
+          </button>
+
           <p style={{ color: 'blue', fontWeight: 'bold', marginTop: '10px', fontSize: '14px' }}>{status}</p>
         </div>
       ) : (
         <div style={{ padding: '20px', border: '2px solid #28a745', borderRadius: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #ccc', paddingBottom: '10px', marginBottom: '20px' }}>
             <h2 style={{ margin: 0 }}>🔓 Két Sắt Của Bạn</h2>
-            <button onClick={() => window.location.reload()} style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Đóng Ví</button>
+            <div>
+              <button onClick={handleRegisterFaceID} style={{ marginRight: '10px', padding: '8px 16px', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
+                📸 Liên kết Sinh Trắc
+              </button>
+              <button onClick={() => window.location.reload()} style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
+                🔒 Đóng Ví
+              </button>
+            </div>
           </div>
 
           <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
@@ -295,8 +385,8 @@ function App() {
               <input type="password" placeholder="Nhập mật khẩu khóa file này..." value={uploadLevel2Key} onChange={(e) => setUploadLevel2Key(e.target.value)} style={{ padding: '8px', width: '100%', marginBottom: '10px', boxSizing: 'border-box' }} />
             )}
             
-            <button onClick={handleUpload} style={{ padding: '8px 16px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Mã Hóa & Cất Giấu</button>
-            <p style={{ color: 'blue', fontSize: '14px' }}>{status}</p>
+            <button onClick={handleUpload} style={{ padding: '8px 16px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>Mã Hóa & Cất Giấu</button>
+            <p style={{ color: 'blue', fontSize: '14px', marginTop: '10px' }}>{status}</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
