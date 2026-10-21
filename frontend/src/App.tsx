@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CryptoJS from 'crypto-js';
 import { encryptFile, decryptFile } from './utils/cryptoService';
 import { generateBlurredThumbnail } from './utils/mediaHelper';
@@ -6,11 +6,15 @@ import MediaCard from './components/MediaCard';
 import type { SecureImage } from './types';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
-// Từ điển sinh từ ngẫu nhiên
 const WORD_LIST = ["apple", "bear", "cat", "dog", "eagle", "fire", "gold", "hero", "iron", "jump", "king", "lion", "moon", "nest", "ocean", "pine", "queen", "rose", "star", "tree", "unit", "vine", "wolf", "xray", "yarn", "zero", "sun", "sky", "sea", "wind", "rain"];
 
+// Định nghĩa kiểu dữ liệu cho Ví đã lưu có kèm Tên
+interface SavedWallet {
+  address: string;
+  name: string;
+}
+
 function App() {
-  // Master Key: 5 từ
   const [seedWords, setSeedWords] = useState<string[]>(Array(5).fill(''));
   const masterKeyString = seedWords.join(' ').trim().toLowerCase();
 
@@ -20,10 +24,29 @@ function App() {
   
   const [file, setFile] = useState<File | null>(null);
   const [isUploadPrivate, setIsUploadPrivate] = useState<boolean>(false);
-  // Upload Private Key: Trở về Mật khẩu chuỗi bình thường
   const [uploadLevel2Key, setUploadLevel2Key] = useState<string>('');
 
-  // Sinh 5 từ ngẫu nhiên cho Két mới
+  // --- NÂNG CẤP: LƯU CẢ TÊN KÉT SẮT ---
+  const [savedWallets, setSavedWallets] = useState<SavedWallet[]>([]);
+
+  const loadSavedWallets = () => {
+    const wallets: SavedWallet[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('vault_key_')) {
+        const address = key.replace('vault_key_', '');
+        // Lấy tên Két sắt đã đặt, nếu chưa có thì dùng tạm mã băm
+        const name = localStorage.getItem(`vault_name_${address}`) || `Két đuôi ...${address.slice(-6)}`;
+        wallets.push({ address, name });
+      }
+    }
+    setSavedWallets(wallets);
+  };
+
+  useEffect(() => {
+    loadSavedWallets();
+  }, [isUnlocked]);
+
   const generateRandomSeed = () => {
     const newArr = [];
     for (let i = 0; i < 5; i++) {
@@ -42,7 +65,6 @@ function App() {
     setSeedWords(newArr);
   };
 
-  // NÂNG CẤP: Nhận thêm tham số overrideKey để hỗ trợ FaceID tự động mở khóa
   const handleUnlockMaster = async (overrideKey?: string | React.MouseEvent) => {
     const isAutoLogin = typeof overrideKey === 'string';
     const activeKey = isAutoLogin ? overrideKey : masterKeyString;
@@ -104,74 +126,59 @@ function App() {
     }
   };
 
-  // ==========================================
-  // API WEBAUTHN / FIDO2 (QUÉT KHUÔN MẶT)
-  // ==========================================
   const handleRegisterFaceID = async () => {
     setStatus("Đang bật Camera/Cảm biến sinh trắc học...");
     try {
       const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
       
-      // 1. Xin máy chủ bài test nhận diện
       const resOpt = await fetch('http://localhost:8000/webauthn/register/generate', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ wallet_address: walletAddress })
       });
       const options = await resOpt.json();
 
-      // 2. Kích hoạt phần cứng thiết bị (FaceID / Windows Hello)
       const attResp = await startRegistration(options);
 
-      // 3. Gửi chữ ký lên máy chủ
       const resVerify = await fetch('http://localhost:8000/webauthn/register/verify', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ wallet_address: walletAddress, credential: attResp })
       });
 
       if (resVerify.ok) {
-        // Lưu lại Key để lần sau mở khóa không cần gõ 5 từ
+        // --- NÂNG CẤP: HỎI TÊN KÉT SẮT ---
+        const customName = window.prompt("Đặt tên cho Két sắt này (VD: Ảnh Gia Đình, Tài Liệu Mật):") || `Két đuôi ...${walletAddress.slice(-6)}`;
+        
         localStorage.setItem(`vault_key_${walletAddress}`, masterKeyString);
-        localStorage.setItem(`last_wallet_address`, walletAddress);
-        setStatus("✅ Đã liên kết sinh trắc học thiết bị này!");
+        localStorage.setItem(`vault_name_${walletAddress}`, customName);
+        
+        loadSavedWallets(); 
+        setStatus(`✅ Đã liên kết sinh trắc học cho: ${customName}`);
       }
     } catch (error) {
       setStatus("❌ Lỗi thiết lập sinh trắc học hoặc đã hủy.");
     }
   };
 
-  const handleLoginWithFaceID = async () => {
+  const handleLoginWithFaceID = async (targetWalletAddress: string) => {
     setStatus("Đang kích hoạt nhận diện khuôn mặt...");
     try {
-      // Lấy địa chỉ ví sử dụng gần nhất trên trình duyệt này
-      const walletAddress = localStorage.getItem('last_wallet_address');
-      if (!walletAddress) {
-        setStatus("❌ Thiết bị này chưa liên kết với Két sắt nào. Hãy đăng nhập bằng 5 từ khóa và liên kết!");
-        return;
-      }
-
-      // 1. Xin máy chủ bài test đăng nhập
       const resOpt = await fetch('http://localhost:8000/webauthn/auth/generate', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ wallet_address: walletAddress })
+        body: JSON.stringify({ wallet_address: targetWalletAddress })
       });
       const options = await resOpt.json();
 
-      // 2. Bật Camera / Cảm biến vân tay
       const asseResp = await startAuthentication(options);
 
-      // 3. Máy chủ xác minh chữ ký phần cứng
       const resVerify = await fetch('http://localhost:8000/webauthn/auth/verify', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ wallet_address: walletAddress, credential: asseResp })
+        body: JSON.stringify({ wallet_address: targetWalletAddress, credential: asseResp })
       });
 
       if (resVerify.ok) {
-        // Rút Key từ kho bí mật của trình duyệt
-        const savedKey = localStorage.getItem(`vault_key_${walletAddress}`);
+        const savedKey = localStorage.getItem(`vault_key_${targetWalletAddress}`);
         if (savedKey) {
-           // Tự động điền 5 từ vào giao diện
            setSeedWords(savedKey.split(' '));
-           // Mở khóa Két luôn
            await handleUnlockMaster(savedKey); 
            setStatus("✅ Đăng nhập sinh trắc học thành công!");
         } else {
@@ -184,7 +191,14 @@ function App() {
       setStatus("❌ Xác thực sinh trắc học thất bại hoặc đã hủy.");
     }
   };
-  // ==========================================
+
+  const handleRemoveSavedWallet = (address: string) => {
+    if (window.confirm("Bỏ liên kết sinh trắc học với Két sắt này trên thiết bị?")) {
+      localStorage.removeItem(`vault_key_${address}`);
+      localStorage.removeItem(`vault_name_${address}`); // Xóa luôn tên
+      loadSavedWallets();
+    }
+  };
 
   const handleUpload = async () => {
     if (!file) return alert("Vui lòng chọn file!");
@@ -350,13 +364,33 @@ function App() {
             🔑 Truy Cập Ví (Bằng 5 Từ Khóa)
           </button>
 
-          <hr style={{ margin: '20px 0', borderTop: '1px dashed #ccc' }} />
-
-          <button onClick={handleLoginWithFaceID} style={{ padding: '12px 24px', backgroundColor: '#000', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%', fontWeight: 'bold' }}>
-            📷 Mở Khóa Nhanh Bằng Sinh Trắc Học
-          </button>
-
           <p style={{ color: 'blue', fontWeight: 'bold', marginTop: '10px', fontSize: '14px' }}>{status}</p>
+
+          {/* --- MENU CHỌN VÍ HIỂN THỊ TÊN KÉT --- */}
+          {savedWallets.length > 0 && (
+            <div style={{ marginTop: '25px', borderTop: '1px dashed #ccc', paddingTop: '20px' }}>
+              <p style={{ fontSize: '14px', color: '#333', fontWeight: 'bold', marginBottom: '15px' }}>
+                📷 CÁC KÉT SẮT ĐÃ LIÊN KẾT TRÊN MÁY NÀY:
+              </p>
+              {savedWallets.map(wallet => (
+                <div key={wallet.address} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+                  <button 
+                    onClick={() => handleLoginWithFaceID(wallet.address)} 
+                    style={{ flex: 1, padding: '12px', backgroundColor: '#000', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Mở {wallet.name}
+                  </button>
+                  <button 
+                    onClick={() => handleRemoveSavedWallet(wallet.address)} 
+                    style={{ padding: '12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', width: '40px' }} 
+                    title="Gỡ bỏ liên kết ví này"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ padding: '20px', border: '2px solid #28a745', borderRadius: '10px' }}>
