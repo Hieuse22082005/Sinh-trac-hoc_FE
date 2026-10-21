@@ -8,11 +8,13 @@ import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
 
 const WORD_LIST = ["apple", "bear", "cat", "dog", "eagle", "fire", "gold", "hero", "iron", "jump", "king", "lion", "moon", "nest", "ocean", "pine", "queen", "rose", "star", "tree", "unit", "vine", "wolf", "xray", "yarn", "zero", "sun", "sky", "sea", "wind", "rain"];
 
-// Định nghĩa kiểu dữ liệu cho Ví đã lưu có kèm Tên
 interface SavedWallet {
   address: string;
   name: string;
 }
+
+// Cài đặt thời gian tự động khóa: 3 phút (3 * 60 * 1000 ms)
+const AUTO_LOCK_TIMEOUT = 3 * 60 * 1000;
 
 function App() {
   const [seedWords, setSeedWords] = useState<string[]>(Array(5).fill(''));
@@ -26,8 +28,10 @@ function App() {
   const [isUploadPrivate, setIsUploadPrivate] = useState<boolean>(false);
   const [uploadLevel2Key, setUploadLevel2Key] = useState<string>('');
 
-  // --- NÂNG CẤP: LƯU CẢ TÊN KÉT SẮT ---
   const [savedWallets, setSavedWallets] = useState<SavedWallet[]>([]);
+  
+  // --- STATE CHO XỬ LÝ HÀNG LOẠT ---
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
 
   const loadSavedWallets = () => {
     const wallets: SavedWallet[] = [];
@@ -35,13 +39,46 @@ function App() {
       const key = localStorage.key(i);
       if (key && key.startsWith('vault_key_')) {
         const address = key.replace('vault_key_', '');
-        // Lấy tên Két sắt đã đặt, nếu chưa có thì dùng tạm mã băm
         const name = localStorage.getItem(`vault_name_${address}`) || `Két đuôi ...${address.slice(-6)}`;
         wallets.push({ address, name });
       }
     }
     setSavedWallets(wallets);
   };
+
+  // --- LOGIC TỰ ĐỘNG KHÓA (AUTO-LOCK) ---
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const lockVault = () => {
+      setIsUnlocked(false);
+      setImages([]);
+      setSelectedFiles([]);
+      setStatus("🔒 Két sắt đã tự động khóa do không có thao tác để bảo vệ an toàn.");
+    };
+
+    const resetTimer = () => {
+      if (isUnlocked) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(lockVault, AUTO_LOCK_TIMEOUT);
+      }
+    };
+
+    if (isUnlocked) {
+      resetTimer(); // Kích hoạt ngay khi vừa mở khóa
+      // Lắng nghe các thao tác của người dùng
+      window.addEventListener('mousemove', resetTimer);
+      window.addEventListener('keydown', resetTimer);
+      window.addEventListener('click', resetTimer);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('click', resetTimer);
+    };
+  }, [isUnlocked]);
 
   useEffect(() => {
     loadSavedWallets();
@@ -73,6 +110,7 @@ function App() {
     
     setStatus("Đang tải thư viện...");
     setImages([]);
+    setSelectedFiles([]);
     
     try {
       const walletAddress = CryptoJS.SHA256(activeKey).toString();
@@ -145,7 +183,6 @@ function App() {
       });
 
       if (resVerify.ok) {
-        // --- NÂNG CẤP: HỎI TÊN KÉT SẮT ---
         const customName = window.prompt("Đặt tên cho Két sắt này (VD: Ảnh Gia Đình, Tài Liệu Mật):") || `Két đuôi ...${walletAddress.slice(-6)}`;
         
         localStorage.setItem(`vault_key_${walletAddress}`, masterKeyString);
@@ -195,7 +232,7 @@ function App() {
   const handleRemoveSavedWallet = (address: string) => {
     if (window.confirm("Bỏ liên kết sinh trắc học với Két sắt này trên thiết bị?")) {
       localStorage.removeItem(`vault_key_${address}`);
-      localStorage.removeItem(`vault_name_${address}`); // Xóa luôn tên
+      localStorage.removeItem(`vault_name_${address}`);
       loadSavedWallets();
     }
   };
@@ -267,7 +304,7 @@ function App() {
         await decryptFile(blob, filePass); 
       } catch (error) {
         alert("❌ Sai mật khẩu riêng! Két sắt từ chối yêu cầu tiêu hủy.");
-        setStatus("❌ Xóa thất bại do sai mật khẩu file.");
+        setStatus("❌ Xóa thất bại.");
         return; 
       }
     }
@@ -280,6 +317,7 @@ function App() {
       const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
       if (response.ok) {
         setImages(prevImages => prevImages.filter(img => img.filename !== filename));
+        setSelectedFiles(prev => prev.filter(f => f !== filename)); // Xóa khỏi danh sách chọn
         setStatus("✅ Đã xóa file vĩnh viễn!");
       } else if (response.status === 403) {
         alert("❌ SAI MẬT KHẨU XÓA HỆ THỐNG!");
@@ -327,6 +365,59 @@ function App() {
     }
   };
 
+  // --- CÁC HÀM XỬ LÝ HÀNG LOẠT ---
+  const toggleSelectFile = (filename: string) => {
+    setSelectedFiles(prev => 
+      prev.includes(filename) ? prev.filter(f => f !== filename) : [...prev, filename]
+    );
+  };
+
+  const handleBatchDownload = () => {
+    selectedFiles.forEach(filename => {
+      const item = images.find(img => img.filename === filename);
+      if (item && item.src) {
+        const a = document.createElement('a');
+        a.href = item.src;
+        a.download = `vault_${filename.replace('.enc', '.png')}`; // Tự động lưu đuôi ảnh
+        a.click();
+      }
+    });
+    setStatus(`✅ Đã tải xuống ${selectedFiles.length} file giải mã!`);
+    setSelectedFiles([]);
+  };
+
+  const handleBatchDelete = async () => {
+    const hasPrivate = images.some(img => selectedFiles.includes(img.filename) && img.is_private);
+    if (hasPrivate) {
+      alert("❌ Bạn đang chọn cả File Tuyệt Mật. Để đảm bảo an toàn, vui lòng xóa riêng từng File Tuyệt Mật để nhập Mật khẩu riêng.");
+      return;
+    }
+
+    const pass = window.prompt(`⚠️ CẢNH BÁO BẢO MẬT\nBạn đang muốn XÓA VĨNH VIỄN ${selectedFiles.length} file.\nNhập MẬT KHẨU XÓA HỆ THỐNG:`);
+    if (!pass) return;
+
+    setStatus(`Đang tiêu hủy ${selectedFiles.length} file...`);
+    let successCount = 0;
+
+    for (const filename of selectedFiles) {
+      try {
+        const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
+        if (response.ok) {
+          successCount++;
+          setImages(prevImages => prevImages.filter(img => img.filename !== filename));
+        } else if (response.status === 403) {
+          alert("❌ SAI MẬT KHẨU XÓA HỆ THỐNG! Quá trình xóa bị hủy.");
+          break;
+        }
+      } catch (error) {
+        console.error("Lỗi xóa file:", filename);
+      }
+    }
+
+    setSelectedFiles([]);
+    setStatus(`✅ Đã tiêu hủy thành công ${successCount} file!`);
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '900px', margin: '0 auto' }}>
       <h1 style={{ textAlign: 'center', color: '#333' }}>Ví Két Sắt (Web3 Standard)</h1>
@@ -366,7 +457,6 @@ function App() {
 
           <p style={{ color: 'blue', fontWeight: 'bold', marginTop: '10px', fontSize: '14px' }}>{status}</p>
 
-          {/* --- MENU CHỌN VÍ HIỂN THỊ TÊN KÉT --- */}
           {savedWallets.length > 0 && (
             <div style={{ marginTop: '25px', borderTop: '1px dashed #ccc', paddingTop: '20px' }}>
               <p style={{ fontSize: '14px', color: '#333', fontWeight: 'bold', marginBottom: '15px' }}>
@@ -406,7 +496,7 @@ function App() {
             </div>
           </div>
 
-          <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+          <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
             <strong>Cất thêm File (Ảnh/Video): </strong>
             <input type="file" accept="image/*,video/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             
@@ -423,15 +513,49 @@ function App() {
             <p style={{ color: 'blue', fontSize: '14px', marginTop: '10px' }}>{status}</p>
           </div>
 
+          {/* --- MENU CÔNG CỤ XỬ LÝ HÀNG LOẠT --- */}
+          {images.length > 0 && (
+            <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#e9ecef', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <button onClick={() => setSelectedFiles(images.filter(img => img.src).map(img => img.filename))} style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc' }}>
+                ☑️ Chọn tất cả file đã mở
+              </button>
+              <button onClick={() => setSelectedFiles([])} style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc' }}>
+                Bỏ chọn
+              </button>
+              <span style={{ fontWeight: 'bold', color: '#495057' }}>Đã chọn: {selectedFiles.length} file</span>
+
+              {selectedFiles.length > 0 && (
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+                  <button onClick={handleBatchDownload} style={{ padding: '6px 12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                    ⬇️ Tải xuống máy
+                  </button>
+                  <button onClick={handleBatchDelete} style={{ padding: '6px 12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                    🗑️ Tiêu hủy loạt
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
             {images.map((item, index) => (
-              <MediaCard 
-                key={index}
-                item={item}
-                onUnlock={handleUnlockSinglePrivate}
-                onDelete={handleDelete}
-                onTogglePrivacy={handleTogglePrivacy}
-              />
+              <div key={index} style={{ position: 'relative' }}>
+                {/* --- CHECKBOX CHỌN FILE --- */}
+                {item.src && (
+                  <input 
+                    type="checkbox" 
+                    checked={selectedFiles.includes(item.filename)}
+                    onChange={() => toggleSelectFile(item.filename)}
+                    style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 10, width: '22px', height: '22px', cursor: 'pointer' }}
+                  />
+                )}
+                <MediaCard 
+                  item={item}
+                  onUnlock={handleUnlockSinglePrivate}
+                  onDelete={handleDelete}
+                  onTogglePrivacy={handleTogglePrivacy}
+                />
+              </div>
             ))}
           </div>
         </div>
