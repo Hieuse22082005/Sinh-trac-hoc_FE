@@ -154,16 +154,47 @@ function App() {
   };
 
   const handleDelete = async (filename: string) => {
+    // 1. Tìm thông tin của file mà người dùng đang muốn xóa
+    const item = images.find(img => img.filename === filename);
+    if (!item) return;
+
+    // 2. NẾU LÀ FILE TUYỆT MẬT -> Ép nhập mật khẩu riêng để xác thực
+    if (item.is_private) {
+      const filePass = window.prompt("🔒 KHÓA BẢO VỆ\nFile này là TUYỆT MẬT. Bạn phải nhập chính xác MẬT KHẨU RIÊNG của file này để được phép tiêu hủy:");
+      if (!filePass) return;
+
+      setStatus(`Đang xác thực mật khẩu riêng...`);
+      try {
+        // Tải file mã hóa về và giải mã thử
+        const fileRes = await fetch(`http://localhost:8000/download/${filename}`);
+        if (!fileRes.ok) throw new Error();
+        const blob = await fileRes.blob();
+        
+        // Cốt lõi bảo mật: Nếu pass sai, hàm decryptFile sẽ văng lỗi và nhảy ngay xuống catch
+        await decryptFile(blob, filePass); 
+      } catch (error) {
+        alert("❌ Sai mật khẩu riêng! Két sắt từ chối yêu cầu tiêu hủy.");
+        setStatus("❌ Xóa thất bại do sai mật khẩu file.");
+        return; // Chặn đứng việc xóa tại đây
+      }
+    }
+
+    // 3. Nếu là file Public (hoặc file Private ĐÃ nhập đúng pass ở trên) -> Hỏi pass Hệ thống
     const pass = window.prompt("⚠️ CẢNH BÁO BẢO MẬT\nNhập MẬT KHẨU XÓA HỆ THỐNG:");
     if (!pass) return;
+    
     setStatus(`Đang xác thực và xóa file...`);
     try {
       const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
       if (response.ok) {
         setImages(prevImages => prevImages.filter(img => img.filename !== filename));
         setStatus("✅ Đã xóa file vĩnh viễn!");
-      } else if (response.status === 403) alert("❌ SAI MẬT KHẨU XÓA!");
-    } catch (error) {}
+      } else if (response.status === 403) {
+        alert("❌ SAI MẬT KHẨU XÓA HỆ THỐNG!");
+      }
+    } catch (error) {
+      setStatus("❌ Lỗi kết nối khi xóa!");
+    }
   };
 
   const handleTogglePrivacy = async (item: SecureImage, newPassword?: string) => {
