@@ -13,7 +13,7 @@ interface SavedWallet {
   name: string;
 }
 
-// Cài đặt thời gian tự động khóa: 3 phút (3 * 60 * 1000 ms)
+// Cài đặt thời gian tự động khóa: 3 phút
 const AUTO_LOCK_TIMEOUT = 3 * 60 * 1000;
 
 function App() {
@@ -29,9 +29,8 @@ function App() {
   const [uploadLevel2Key, setUploadLevel2Key] = useState<string>('');
 
   const [savedWallets, setSavedWallets] = useState<SavedWallet[]>([]);
-  
-  // --- STATE CHO XỬ LÝ HÀNG LOẠT ---
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   const loadSavedWallets = () => {
     const wallets: SavedWallet[] = [];
@@ -46,7 +45,6 @@ function App() {
     setSavedWallets(wallets);
   };
 
-  // --- LOGIC TỰ ĐỘNG KHÓA (AUTO-LOCK) ---
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
 
@@ -54,6 +52,8 @@ function App() {
       setIsUnlocked(false);
       setImages([]);
       setSelectedFiles([]);
+      setViewingImage(null);
+      setSeedWords(Array(5).fill('')); 
       setStatus("🔒 Két sắt đã tự động khóa do không có thao tác để bảo vệ an toàn.");
     };
 
@@ -65,8 +65,7 @@ function App() {
     };
 
     if (isUnlocked) {
-      resetTimer(); // Kích hoạt ngay khi vừa mở khóa
-      // Lắng nghe các thao tác của người dùng
+      resetTimer(); 
       window.addEventListener('mousemove', resetTimer);
       window.addEventListener('keydown', resetTimer);
       window.addEventListener('click', resetTimer);
@@ -165,13 +164,17 @@ function App() {
   };
 
   const handleRegisterFaceID = async () => {
+    const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
+    
+    // --- NÂNG CẤP: Hỏi tên Két sắt NGAY TỪ ĐẦU ---
+    const customName = window.prompt("Nhập tên cho Két sắt này để hiển thị trên trình duyệt (VD: Ảnh Gia Đình):") || `Két đuôi ...${walletAddress.slice(-6)}`;
+    
     setStatus("Đang bật Camera/Cảm biến sinh trắc học...");
     try {
-      const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
-      
       const resOpt = await fetch('http://localhost:8000/webauthn/register/generate', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ wallet_address: walletAddress })
+        // Gửi kèm tên vừa nhập xuống Backend
+        body: JSON.stringify({ wallet_address: walletAddress, vault_name: customName }) 
       });
       const options = await resOpt.json();
 
@@ -183,8 +186,6 @@ function App() {
       });
 
       if (resVerify.ok) {
-        const customName = window.prompt("Đặt tên cho Két sắt này (VD: Ảnh Gia Đình, Tài Liệu Mật):") || `Két đuôi ...${walletAddress.slice(-6)}`;
-        
         localStorage.setItem(`vault_key_${walletAddress}`, masterKeyString);
         localStorage.setItem(`vault_name_${walletAddress}`, customName);
         
@@ -205,7 +206,10 @@ function App() {
       });
       const options = await resOpt.json();
 
-      const asseResp = await startAuthentication(options);
+      // --- NÂNG CẤP: ÉP TRÌNH DUYỆT BỎ QUA HỘP THOẠI TRUNG GIAN ---
+      const asseResp = await startAuthentication({
+        optionsJSON: options,
+      });
 
       const resVerify = await fetch('http://localhost:8000/webauthn/auth/verify', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -317,7 +321,7 @@ function App() {
       const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
       if (response.ok) {
         setImages(prevImages => prevImages.filter(img => img.filename !== filename));
-        setSelectedFiles(prev => prev.filter(f => f !== filename)); // Xóa khỏi danh sách chọn
+        setSelectedFiles(prev => prev.filter(f => f !== filename)); 
         setStatus("✅ Đã xóa file vĩnh viễn!");
       } else if (response.status === 403) {
         alert("❌ SAI MẬT KHẨU XÓA HỆ THỐNG!");
@@ -365,7 +369,6 @@ function App() {
     }
   };
 
-  // --- CÁC HÀM XỬ LÝ HÀNG LOẠT ---
   const toggleSelectFile = (filename: string) => {
     setSelectedFiles(prev => 
       prev.includes(filename) ? prev.filter(f => f !== filename) : [...prev, filename]
@@ -378,7 +381,7 @@ function App() {
       if (item && item.src) {
         const a = document.createElement('a');
         a.href = item.src;
-        a.download = `vault_${filename.replace('.enc', '.png')}`; // Tự động lưu đuôi ảnh
+        a.download = `vault_${filename.replace('.enc', '')}`; 
         a.click();
       }
     });
@@ -513,7 +516,6 @@ function App() {
             <p style={{ color: 'blue', fontSize: '14px', marginTop: '10px' }}>{status}</p>
           </div>
 
-          {/* --- MENU CÔNG CỤ XỬ LÝ HÀNG LOẠT --- */}
           {images.length > 0 && (
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#e9ecef', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '15px' }}>
               <button onClick={() => setSelectedFiles(images.filter(img => img.src).map(img => img.filename))} style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc' }}>
@@ -540,15 +542,34 @@ function App() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
             {images.map((item, index) => (
               <div key={index} style={{ position: 'relative' }}>
-                {/* --- CHECKBOX CHỌN FILE --- */}
+                
+                {item.src && (
+                  <button 
+                    onClick={() => setViewingImage(item.src)}
+                    style={{ 
+                      position: 'absolute', bottom: '15px', left: '15px', zIndex: 10, 
+                      padding: '6px 10px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', 
+                      border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold',
+                      boxShadow: '0 0 5px rgba(0,0,0,0.5)'
+                    }}
+                  >
+                    🔍 Xem
+                  </button>
+                )}
+
                 {item.src && (
                   <input 
                     type="checkbox" 
                     checked={selectedFiles.includes(item.filename)}
                     onChange={() => toggleSelectFile(item.filename)}
-                    style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 10, width: '22px', height: '22px', cursor: 'pointer' }}
+                    style={{ 
+                      position: 'absolute', bottom: '15px', right: '15px', zIndex: 10, 
+                      width: '24px', height: '24px', cursor: 'pointer',
+                      boxShadow: '0 0 8px rgba(0,0,0,0.8)', borderRadius: '4px'
+                    }}
                   />
                 )}
+                
                 <MediaCard 
                   item={item}
                   onUnlock={handleUnlockSinglePrivate}
@@ -558,6 +579,45 @@ function App() {
               </div>
             ))}
           </div>
+
+          {viewingImage && (
+            <div 
+              style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999,
+                display: 'flex', justifyContent: 'center', alignItems: 'center'
+              }}
+              onClick={() => setViewingImage(null)}
+            >
+              <button 
+                onClick={() => setViewingImage(null)}
+                style={{
+                  position: 'absolute', top: '20px', right: '30px',
+                  background: 'transparent', color: 'white', border: 'none',
+                  fontSize: '40px', cursor: 'pointer', zIndex: 10000
+                }}
+              >
+                &times;
+              </button>
+
+              {viewingImage.startsWith('data:video') ? (
+                <video 
+                  src={viewingImage} 
+                  controls autoPlay 
+                  style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '8px', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}
+                  onClick={(e) => e.stopPropagation()} 
+                />
+              ) : (
+                <img 
+                  src={viewingImage} 
+                  alt="Full size" 
+                  style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}
+                  onClick={(e) => e.stopPropagation()} 
+                />
+              )}
+            </div>
+          )}
+
         </div>
       )}
     </div>
