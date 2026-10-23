@@ -18,6 +18,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
   const [isScanning, setIsScanning] = useState(false);
   
   const [isPasswordHidden, setIsPasswordHidden] = useState(false);
+  const [showSeedWarning, setShowSeedWarning] = useState(false);
   
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -44,6 +45,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
       newArr.push(WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)]);
     }
     setSeedWords(newArr);
+    setShowSeedWarning(true);
     setStatus("💡 Đã tạo ví mới. Vui lòng ghi nhớ 5 từ khóa này.");
     if (inputRefs.current[0]) inputRefs.current[0].focus();
   };
@@ -212,6 +214,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
           
           <p className="text-[#94a3b8] text-[15px] mb-12">Bảo mật sinh trắc học kết hợp khóa phi tập trung.</p>
 
+          {/* BOX FACE ID */}
           <div className="relative w-full max-w-[450px] bg-[#0A0D14]/80 border border-[#1E293B] rounded-2xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl">
             
             <div className="flex justify-between items-center mb-6">
@@ -257,23 +260,24 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
               <span className="text-[13px] font-bold uppercase tracking-wider text-slate-300 group-hover:text-white">Nhấn để quét khuôn mặt</span>
             </button>
 
-            {/* POPUP CHỌN KÉT ĐƯỢC CHUYỂN THÀNH LỚP PHỦ OVERLAY LÊN TRÊN CARD */}
+            {/* OVERLAY CHỌN KÉT TRONG KHUNG - CHUẨN XÁC THEO HÌNH VÀ YÊU CẦU CỦA BẠN */}
             {showWalletList && (
-              <div className="absolute inset-0 w-full h-full bg-[#0B0F19]/95 backdrop-blur-xl border border-[#00f0ff]/40 rounded-2xl p-6 shadow-[0_30px_80px_rgba(0,0,0,0.95)] z-[9999] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center mb-4 border-b border-[#1E293B] pb-4 shrink-0">
+              <div className="absolute inset-0 w-full h-full bg-[#0A0D14]/95 backdrop-blur-2xl border border-[#00f0ff]/40 rounded-2xl flex flex-col z-[100] animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-[#1E293B] shrink-0">
                   <h3 className="text-[#00f0ff] text-[13px] font-bold uppercase tracking-widest">Chọn Két Đăng Nhập</h3>
                   <button onClick={() => setShowWalletList(false)} className="text-[#64748B] hover:text-white transition-colors">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12"/></svg>
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 pt-4 space-y-3 pointer-events-auto">
                   {savedWallets.map(wallet => (
                     <div key={wallet.address} className="flex items-center gap-2 group/item">
                       <button 
                         onClick={() => handleLoginWithFaceID(wallet.address)} 
                         className="flex-1 flex items-center gap-4 px-5 py-4 bg-[#1E293B]/60 hover:bg-[#00f0ff]/20 border border-transparent hover:border-[#00f0ff]/50 text-white rounded-xl text-[14px] font-bold transition-all text-left shadow-sm"
                       >
-                        <span className="text-[#94A3B8] text-base">👤</span> {wallet.name}
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                        {wallet.name}
                       </button>
                       <button 
                         onClick={() => handleRemoveSavedWallet(wallet.address)} 
@@ -299,19 +303,35 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
         {/* ================= CỘT PHẢI: FORMS ================= */}
         <div className="flex-1 flex flex-col justify-center px-4 lg:pl-16 gap-6 relative z-20">
           
-          <div className="bg-[#21243B]/60 backdrop-blur-md border border-white/5 rounded-2xl p-5 flex items-center justify-between hover:border-[#8B5CF6]/50 transition-colors group cursor-pointer" onClick={generateRandomSeed}>
-            <div className="flex items-center gap-5">
-              <div className="w-[50px] h-[50px] rounded-xl bg-[#0F111A] border border-[#2D3348] flex items-center justify-center shadow-inner group-hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          <div className="flex flex-col gap-3">
+            <div className="bg-[#21243B]/60 backdrop-blur-md border border-white/5 rounded-2xl p-5 flex items-center justify-between hover:border-[#8B5CF6]/50 transition-colors group cursor-pointer" onClick={generateRandomSeed}>
+              <div className="flex items-center gap-5">
+                <div className="w-[50px] h-[50px] rounded-xl bg-[#0F111A] border border-[#2D3348] flex items-center justify-center shadow-inner group-hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                </div>
+                <div>
+                  <h3 className="text-[18px] font-bold text-white mb-1">Khởi tạo Ví Mới</h3>
+                  <p className="text-[12px] text-[#64748B]">Tạo chuỗi 5 ký tự bảo mật mới chỉ trong 1 bước</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-[18px] font-bold text-white mb-1">Khởi tạo Ví Mới</h3>
-                <p className="text-[12px] text-[#64748B]">Tạo chuỗi 5 ký tự bảo mật mới chỉ trong 1 bước</p>
+              <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center bg-white/5 group-hover:bg-[#8B5CF6]/20 group-hover:border-[#8B5CF6]/50 transition-all text-slate-400 group-hover:text-white">
+                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center bg-white/5 group-hover:bg-[#8B5CF6]/20 group-hover:border-[#8B5CF6]/50 transition-all text-slate-400 group-hover:text-white">
-               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </div>
+
+            {/* KHUNG CẢNH BÁO LƯU 5 CHỮ KHI TẠO VÍ MỚI */}
+            {showSeedWarning && (
+              <div className="bg-[#FFB020]/10 border border-[#FFB020]/40 rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 shadow-[0_5px_15px_rgba(255,176,32,0.1)]">
+                <span className="text-[#FFB020] text-base leading-none mt-0.5">⚠️</span>
+                <p className="text-[#FDE68A] text-[12px] leading-relaxed flex-1">
+                  <strong className="text-[#FFB020] font-bold uppercase tracking-wider block mb-1">Lưu ý quan trọng:</strong>
+                  Hãy lưu 5 chữ này cẩn thận bằng cách chụp lại hoặc viết vào chỗ bí mật.
+                </p>
+                <button onClick={(e) => { e.stopPropagation(); setShowSeedWarning(false); }} className="text-[#FFB020]/60 hover:text-[#FFB020] p-1 transition-colors">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-[#24263A]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-8 shadow-2xl relative">
