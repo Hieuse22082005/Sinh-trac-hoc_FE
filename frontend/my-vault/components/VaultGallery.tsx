@@ -82,7 +82,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
   const fetchImages = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/photos?wallet_address=${walletAddress}`);
+      const res = await fetch(`https://sinh-trac-hoc-be.onrender.com/photos?wallet_address=${walletAddress}`);
       const data = await res.json();
       const processedImages: ExtendedSecureImage[] = [];
       for (const item of data.photos) {
@@ -94,7 +94,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
           processedImages.push({ filename: item.filename, src: null, thumb: decryptedThumb, originalThumb: decryptedThumb, is_private: true });
         } else {
           try {
-            const fileRes = await fetch(`http://localhost:8000/download/${item.filename}`);
+            const fileRes = await fetch(`https://sinh-trac-hoc-be.onrender.com/download/${item.filename}`);
             if (fileRes.ok) {
               const base64Data = await decryptFile(await fileRes.blob(), masterKeyString);
               processedImages.push({ filename: item.filename, src: base64Data, thumb: null, originalThumb: null, is_private: false });
@@ -175,10 +175,10 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
     showStatus("Đang bật Cảm biến sinh trắc học...", 0);
     try {
-      const resOpt = await fetch('http://localhost:8000/webauthn/register/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, vault_name: finalName }) });
+      const resOpt = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, vault_name: finalName }) });
       const options = await resOpt.json();
       const attResp = await startRegistration(options);
-      const resVerify = await fetch('http://localhost:8000/webauthn/register/verify', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, credential: attResp }) });
+      const resVerify = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/verify', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, credential: attResp }) });
       if (resVerify.ok) {
         localStorage.setItem(`vault_key_${walletAddress}`, masterKeyString);
         localStorage.setItem(`vault_name_${walletAddress}`, finalName);
@@ -226,7 +226,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       formData.append('thumbnail', encryptedThumb);
       formData.append('wallet_address', walletAddress); 
       
-      const response = await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
+      const response = await fetch('https://sinh-trac-hoc-be.onrender.com/upload', { method: 'POST', body: formData });
       if (response.ok) { 
         try {
            const resData = await response.json();
@@ -267,10 +267,10 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       formData.append('is_private', makePrivate ? 'true' : 'false');
       formData.append('thumbnail', encryptedThumb);
       formData.append('wallet_address', walletAddress); 
-      await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
+      await fetch('https://sinh-trac-hoc-be.onrender.com/upload', { method: 'POST', body: formData });
       
       const sysDeletePass = process.env.NEXT_PUBLIC_DELETE_PASSWORD || 'admin123';
-      await fetch(`http://localhost:8000/delete/${item.filename}?delete_pass=${sysDeletePass}`, { method: 'DELETE' });
+      await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${item.filename}?delete_pass=${sysDeletePass}`, { method: 'DELETE' });
       fetchImages(); 
       showStatus(makePrivate ? "✅ Đã khóa tuyệt mật!" : "✅ Đã chuyển thành công khai!");
     } catch (error) { showStatus("❌ Lỗi chuyển đổi!"); }
@@ -279,7 +279,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
   const handleUnlockSinglePrivate = async (filename: string, specificKey: string) => {
     showStatus(`Đang giải mã...`, 0);
     try {
-      const fileRes = await fetch(`http://localhost:8000/download/${filename}`);
+      const fileRes = await fetch(`https://sinh-trac-hoc-be.onrender.com/download/${filename}`);
       const base64Data = await decryptFile(await fileRes.blob(), specificKey);
       setImages(prev => prev.map(img => img.filename === filename ? { ...img, src: base64Data, originalThumb: img.thumb, thumb: null } : img));
       showStatus("✅ Mở khóa thành công!");
@@ -321,7 +321,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     let pass = localStorage.getItem('sys_del_pass') || await askPrompt("Nhập MẬT KHẨU HỆ THỐNG:", true);
     if (!pass) return;
     try {
-      const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
+      const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
       if (response.ok) {
         setImages(prev => prev.filter(img => img.filename !== filename));
         setTrashList(trashList.filter(t => t.filename !== filename));
@@ -353,7 +353,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       showStatus(`Đang tiêu hủy ${selectedFiles.length} file...`, 0);
       for (const filename of selectedFiles) {
         try {
-          const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
+          const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
           if (response.ok) {
              setImages(prev => prev.filter(img => img.filename !== filename));
              setTrashList(prev => prev.filter(t => t.filename !== filename));

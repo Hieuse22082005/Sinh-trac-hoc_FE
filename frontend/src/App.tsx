@@ -114,7 +114,7 @@ function App() {
     try {
       const walletAddress = CryptoJS.SHA256(activeKey).toString();
       
-      const res = await fetch(`http://localhost:8000/photos?wallet_address=${walletAddress}`);
+      const res = await fetch(`https://sinh-trac-hoc-be.onrender.com/photos?wallet_address=${walletAddress}`);
       const data = await res.json();
       const dbPhotos: {filename: string, is_private: boolean, thumbnail: string}[] = data.photos;
 
@@ -139,7 +139,7 @@ function App() {
           processedImages.push({ filename: item.filename, src: null, thumb: decryptedThumb, is_private: true });
         } else {
           try {
-            const fileRes = await fetch(`http://localhost:8000/download/${item.filename}`);
+            const fileRes = await fetch(`https://sinh-trac-hoc-be.onrender.com/download/${item.filename}`);
             if (fileRes.ok) {
               const blob = await fileRes.blob();
               const base64Data = await decryptFile(blob, activeKey);
@@ -171,7 +171,7 @@ function App() {
     
     setStatus("Đang bật Camera/Cảm biến sinh trắc học...");
     try {
-      const resOpt = await fetch('http://localhost:8000/webauthn/register/generate', {
+      const resOpt = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/generate', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         // Gửi kèm tên vừa nhập xuống Backend
         body: JSON.stringify({ wallet_address: walletAddress, vault_name: customName }) 
@@ -180,7 +180,7 @@ function App() {
 
       const attResp = await startRegistration(options);
 
-      const resVerify = await fetch('http://localhost:8000/webauthn/register/verify', {
+      const resVerify = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/verify', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ wallet_address: walletAddress, credential: attResp })
       });
@@ -200,7 +200,7 @@ function App() {
   const handleLoginWithFaceID = async (targetWalletAddress: string) => {
     setStatus("Đang kích hoạt nhận diện khuôn mặt...");
     try {
-      const resOpt = await fetch('http://localhost:8000/webauthn/auth/generate', {
+      const resOpt = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/auth/generate', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ wallet_address: targetWalletAddress })
       });
@@ -211,7 +211,7 @@ function App() {
         optionsJSON: options,
       });
 
-      const resVerify = await fetch('http://localhost:8000/webauthn/auth/verify', {
+      const resVerify = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/auth/verify', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ wallet_address: targetWalletAddress, credential: asseResp })
       });
@@ -264,7 +264,7 @@ function App() {
       formData.append('thumbnail', encryptedThumb);
       formData.append('wallet_address', walletAddress); 
 
-      const response = await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
+      const response = await fetch('https://sinh-trac-hoc-be.onrender.com/upload', { method: 'POST', body: formData });
 
       if (response.ok) {
         setStatus("✅ Đã cất an toàn!");
@@ -280,7 +280,7 @@ function App() {
   const handleUnlockSinglePrivate = async (filename: string, specificKey: string) => {
     setStatus(`Đang giải mã...`);
     try {
-      const fileRes = await fetch(`http://localhost:8000/download/${filename}`);
+      const fileRes = await fetch(`https://sinh-trac-hoc-be.onrender.com/download/${filename}`);
       if (!fileRes.ok) throw new Error();
       const blob = await fileRes.blob();
       const base64Data = await decryptFile(blob, specificKey);
@@ -302,7 +302,7 @@ function App() {
 
       setStatus(`Đang xác thực mật khẩu riêng...`);
       try {
-        const fileRes = await fetch(`http://localhost:8000/download/${filename}`);
+        const fileRes = await fetch(`https://sinh-trac-hoc-be.onrender.com/download/${filename}`);
         if (!fileRes.ok) throw new Error();
         const blob = await fileRes.blob();
         await decryptFile(blob, filePass); 
@@ -318,7 +318,7 @@ function App() {
     
     setStatus(`Đang xác thực và xóa file...`);
     try {
-      const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
+      const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
       if (response.ok) {
         setImages(prevImages => prevImages.filter(img => img.filename !== filename));
         setSelectedFiles(prev => prev.filter(f => f !== filename)); 
@@ -357,10 +357,10 @@ function App() {
       formData.append('thumbnail', encryptedThumb);
       formData.append('wallet_address', walletAddress); 
 
-      await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
+      await fetch('https://sinh-trac-hoc-be.onrender.com/upload', { method: 'POST', body: formData });
       
       const sysDeletePass = import.meta.env.VITE_DELETE_PASSWORD || 'admin123';
-      await fetch(`http://localhost:8000/delete/${item.filename}?delete_pass=${sysDeletePass}`, { method: 'DELETE' });
+      await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${item.filename}?delete_pass=${sysDeletePass}`, { method: 'DELETE' });
 
       setStatus("✅ Đã chuyển đổi trạng thái thành công!");
       handleUnlockMaster(); 
@@ -404,7 +404,7 @@ function App() {
 
     for (const filename of selectedFiles) {
       try {
-        const response = await fetch(`http://localhost:8000/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
+        const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
         if (response.ok) {
           successCount++;
           setImages(prevImages => prevImages.filter(img => img.filename !== filename));

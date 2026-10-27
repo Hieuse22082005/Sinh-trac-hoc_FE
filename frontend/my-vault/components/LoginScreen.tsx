@@ -131,7 +131,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
     setStatus("⏳ Đang xác thực...");
     try {
       const walletAddress = CryptoJS.SHA256(activeKey).toString();
-      const res = await fetch(`http://localhost:8000/photos?wallet_address=${walletAddress}`);
+      const res = await fetch(`https://sinh-trac-hoc-be.onrender.com/photos?wallet_address=${walletAddress}`);
       
       if (res.ok) {
         onUnlockSuccess(activeKey);
@@ -150,13 +150,13 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
     
     setTimeout(async () => {
       try {
-        const resOpt = await fetch('http://localhost:8000/webauthn/auth/generate', {
+        const resOpt = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/auth/generate', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ wallet_address: targetWalletAddress })
         });
         const options = await resOpt.json();
         const asseResp = await startAuthentication({ optionsJSON: options });
-        const resVerify = await fetch('http://localhost:8000/webauthn/auth/verify', {
+        const resVerify = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/auth/verify', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ wallet_address: targetWalletAddress, credential: asseResp })
         });
