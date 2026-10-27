@@ -5,7 +5,7 @@ import { encryptFile, decryptFile } from '../utils/cryptoService';
 import { generateBlurredThumbnail } from '../utils/mediaHelper';
 import type { SecureImage } from '../types';
 import { startRegistration } from '@simplewebauthn/browser';
-
+import { ShieldCheck } from "lucide-react";
 const AUTO_LOCK_TIMEOUT = 3 * 60 * 1000;
 interface TrashItem { filename: string; deletedAt: number; }
 interface ExtendedSecureImage extends SecureImage { originalThumb?: string | null; }
@@ -441,9 +441,13 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       <div className="relative z-10 flex w-full h-full">
         <aside className={`w-64 shrink-0 border-r flex flex-col pt-8 hidden md:flex overflow-y-auto custom-scrollbar backdrop-blur-2xl transition-colors duration-500 ${sidebarBg}`}>
           <div className="px-8 mb-10 flex items-center gap-3 cursor-pointer group active:scale-95 transition-transform" onClick={() => setActiveTab('all')}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xl group-hover:scale-110 transition-transform shadow-lg ${isDark ? 'bg-slate-200 text-slate-900' : 'bg-indigo-600 text-white shadow-indigo-500/30'}`}>👻</div>
-            <h1 className={`text-2xl font-bold tracking-tight truncate transition-colors ${textHeading}`}>{vaultName}</h1>
-          </div>
+                <div className="flex items-center justify-center w-10 h-10 shrink-0 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-full shadow-[0_0_15px_rgba(79,70,229,0.5)] group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,70,229,0.7)] transition-all duration-300">
+                  <ShieldCheck className="w-5 h-5 text-white" strokeWidth={2.5} />
+                </div>
+                <h1 className={`text-2xl font-extrabold tracking-tight truncate transition-colors ${textHeading}`}>
+                  {vaultName}
+                </h1>
+              </div>
 
           <div className="flex-1 px-4 space-y-1">
             <p className={`text-[11px] font-bold uppercase tracking-widest mb-4 ml-4 ${isDark ? 'text-slate-500' : 'text-indigo-400'}`}>Góc riêng của bạn</p>
