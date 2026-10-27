@@ -279,7 +279,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                   <img 
                     src="/image_90a679.png" 
                     alt="Biometric Scan" 
-                    className={`w-auto h-full object-contain mix-blend-screen transition-transform duration-300 ${(isScanning || showWalletList) ? 'scale-110' : 'scale-100'}`}
+                    className={`w-auto h-full object-contain mix-blend-screen transition-transform duration-300 ${(isScanning || showWalletList) ? 'scale-150' : 'scale-150'}`}
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                       if (!e.currentTarget.parentElement?.querySelector('.error-text')) {
