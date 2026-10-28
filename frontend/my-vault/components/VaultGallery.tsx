@@ -6,6 +6,9 @@ import { generateBlurredThumbnail } from '../utils/mediaHelper';
 import type { SecureImage } from '../types';
 import { startRegistration } from '@simplewebauthn/browser';
 import { ShieldCheck } from "lucide-react";
+// ĐẢM BẢO BẠN ĐÃ IMPORT SUPABASE CLIENT
+import { supabase } from '@/lib/supabaseClient';
+
 const AUTO_LOCK_TIMEOUT = 3 * 60 * 1000;
 interface TrashItem { filename: string; deletedAt: number; }
 interface ExtendedSecureImage extends SecureImage { originalThumb?: string | null; }
@@ -37,6 +40,47 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
+
+  // =========================================================================
+  // BƯỚC 5: LẮNG NGHE SUPABASE REALTIME ĐỂ ĐÁ THIẾT BỊ KHÁC
+  // =========================================================================
+  useEffect(() => {
+    // Lấy thông tin thiết bị hiện tại đã lưu ở màn hình Login
+    const currentDeviceId = localStorage.getItem('device_id'); 
+    const currentWalletAddress = localStorage.getItem('wallet_address');
+
+    if (!currentDeviceId || !currentWalletAddress) return;
+
+    const channel = supabase
+      .channel('vault_device_tracker')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'passkeys', // Lắng nghe bảng passkeys
+          filter: `wallet_address=eq.${currentWalletAddress}`, // Chỉ nghe đúng Két đang mở
+        },
+        (payload) => {
+          // Nếu active_device_id trên DB thay đổi và KHÁC với máy đang cầm
+          if (payload.new.active_device_id && payload.new.active_device_id !== currentDeviceId) {
+            // Xóa khóa giải mã và session
+            sessionStorage.removeItem('e2ee_master_key'); 
+            localStorage.clear(); 
+            
+            alert('Cảnh báo: Tài khoản đã được truy cập từ thiết bị khác. Bạn đã bị đăng xuất!');
+            // Reload trang để quay về Login
+            window.location.reload(); 
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+  // =========================================================================
 
   const showStatus = (msg: string, timeout = 3000) => {
     setStatus(msg);
@@ -177,7 +221,10 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     try {
       const resOpt = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, vault_name: finalName }) });
       const options = await resOpt.json();
-      const attResp = await startRegistration(options);
+      
+      // ĐÃ SỬA: Bọc options trong optionsJSON
+      const attResp = await startRegistration({ optionsJSON: options }); 
+      
       const resVerify = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/verify', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, credential: attResp }) });
       if (resVerify.ok) {
         localStorage.setItem(`vault_key_${walletAddress}`, masterKeyString);
@@ -186,6 +233,24 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         showStatus(`✅ Đã thêm FaceID!`);
       }
     } catch (error) { showStatus("❌ Hủy đăng ký."); }
+  };
+
+  // HÀM ĐĂNG KÝ EMAIL MỚI THÊM
+  const handleRegisterEmail = async () => {
+    const email = await askPrompt("Nhập địa chỉ Email bảo mật (Dùng để nhận OTP):", false);
+    if (!email) return;
+
+    showStatus("Đang lưu email...", 0);
+    const { error } = await supabase
+      .from('passkeys')
+      .update({ recovery_email: email.trim() })
+      .eq('wallet_address', walletAddress);
+
+    if (error) {
+      showStatus(`❌ Lỗi: ${error.message}`);
+    } else {
+      showStatus("✅ Đã liên kết Email bảo mật thành công!");
+    }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -488,9 +553,14 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
             <div className="flex items-center gap-4 md:gap-6">
               {status && <span className="text-xs text-emerald-500 font-bold animate-pulse bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">{status}</span>}
+              
               <button onClick={toggleTheme} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-90 shadow-md border ${isDark ? 'bg-white/5 border-white/10 text-yellow-300 hover:bg-white/10' : 'bg-white border-slate-200 text-indigo-500 hover:bg-slate-50'}`} title="Đổi giao diện">
                 {isDark ? '🌞' : '🌙'}
               </button>
+              
+              {/* NÚT ĐĂNG KÝ EMAIL */}
+              <button onClick={handleRegisterEmail} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>✉️ Email OTP</button>
+
               <button onClick={handleRegisterFaceID} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>📸 FaceID</button>
               <button onClick={onLock} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20' : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'}`}>[→ Khóa Két</button>
             </div>

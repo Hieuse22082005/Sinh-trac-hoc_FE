@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import CryptoJS from 'crypto-js';
 import { startAuthentication } from '@simplewebauthn/browser';
+import { supabase } from '@/lib/supabaseClient'; // Đảm bảo import Supabase
 
 const WORD_LIST = ["apple", "bear", "cat", "dog", "eagle", "fire", "gold", "hero", "iron", "jump", "king", "lion", "moon", "nest", "ocean", "pine", "queen", "rose", "star", "tree", "unit", "vine", "wolf", "xray", "yarn", "zero", "sun", "sky", "sea", "wind", "rain"];
 
@@ -23,8 +24,14 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
   const [isStealth, setIsStealth] = useState(true);
   const [tapCount, setTapCount] = useState(0);
 
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // STATE CHO OTP
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [pendingKey, setPendingKey] = useState('');
+  const [pendingWallet, setPendingWallet] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const masterKeyString = seedWords.join(' ').trim().toLowerCase();
 
   useEffect(() => {
@@ -119,6 +126,9 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
     }
   };
 
+  // =========================================================================
+  // LOGIC ĐĂNG NHẬP: KIỂM TRA THIẾT BỊ VÀ OTP
+  // =========================================================================
   const handleUnlockMaster = async (overrideKey?: string | React.MouseEvent) => {
     const isAutoLogin = typeof overrideKey === 'string';
     const activeKey = isAutoLogin ? overrideKey : masterKeyString;
@@ -128,18 +138,108 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
       return;
     }
     
-    setStatus("⏳ Đang xác thực...");
+    setStatus("⏳ Đang kiểm tra két sắt...");
     try {
       const walletAddress = CryptoJS.SHA256(activeKey).toString();
-      const res = await fetch(`https://sinh-trac-hoc-be.onrender.com/photos?wallet_address=${walletAddress}`);
       
-      if (res.ok) {
-        onUnlockSuccess(activeKey);
+      let currentDeviceId = localStorage.getItem('device_id');
+      if (!currentDeviceId) {
+        currentDeviceId = `device_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('device_id', currentDeviceId);
+      }
+
+      // Kiểm tra thiết bị trên Supabase
+      const { data: passkeyData, error } = await supabase
+        .from('passkeys')
+        .select('active_device_id, recovery_email')
+        .eq('wallet_address', walletAddress)
+        .single();
+
+      // Nếu Két đã có thiết bị khác đăng nhập
+      if (passkeyData && passkeyData.active_device_id && passkeyData.active_device_id !== currentDeviceId) {
+        if (!passkeyData.recovery_email) {
+          setStatus("❌ Két này chưa liên kết Email bảo mật. Không thể đăng nhập từ máy lạ!");
+          return;
+        }
+
+        // Gọi API gửi OTP
+        setStatus("Đang gửi mã OTP đến email của bạn...");
+        const otpRes = await fetch('https://sinh-trac-hoc-be.onrender.com/request-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet_address: walletAddress })
+        });
+
+        if (!otpRes.ok) {
+          setStatus("❌ Lỗi gửi email OTP.");
+          return;
+        }
+
+        // Mở popup OTP
+        setPendingKey(activeKey);
+        setPendingWallet(walletAddress);
+        setShowOtpModal(true);
+        setStatus("✅ Vui lòng kiểm tra email.");
+        return;
+      }
+
+      // NẾU LÀ MÁY QUEN (HOẶC CHƯA CÓ AI ĐĂNG NHẬP) -> VÀO THẲNG
+      await executeFinalLogin(activeKey, walletAddress, currentDeviceId);
+
+    } catch (error) {
+      setStatus("❌ Lỗi hệ thống. Không thể đăng nhập.");
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpInput || otpInput.length < 6) return setStatus("❌ Vui lòng nhập đủ mã OTP");
+    
+    setIsSendingOtp(true);
+    setStatus("Đang xác thực OTP...");
+    try {
+      const currentDeviceId = localStorage.getItem('device_id')!;
+      
+      const verifyRes = await fetch('https://sinh-trac-hoc-be.onrender.com/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          wallet_address: pendingWallet,
+          otp_code: otpInput.trim(),
+          new_device_id: currentDeviceId
+        })
+      });
+
+      if (verifyRes.ok) {
+        setShowOtpModal(false);
+        setOtpInput('');
+        setStatus("✅ Xác thực thành công!");
+        await executeFinalLogin(pendingKey, pendingWallet, currentDeviceId);
       } else {
-        setStatus("❌ Từ khóa khôi phục không đúng!");
+        const err = await verifyRes.json();
+        setStatus(`❌ ${err.detail || "OTP không hợp lệ"}`);
       }
     } catch (error) {
-      setStatus("❌ Lỗi kết nối máy chủ.");
+      setStatus("❌ Lỗi kết nối máy chủ");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const executeFinalLogin = async (activeKey: string, walletAddress: string, deviceId: string) => {
+    // Cập nhật Database để ghi nhận thiết bị này (Phòng trường hợp Két mới tạo)
+    await supabase.from('passkeys').update({ active_device_id: deviceId }).eq('wallet_address', walletAddress);
+    
+    // Lưu session khóa E2EE
+    sessionStorage.setItem('e2ee_master_key', walletAddress); 
+    localStorage.setItem('wallet_address', walletAddress);
+
+    // Kéo dữ liệu ảnh bung Két
+    const res = await fetch(`https://sinh-trac-hoc-be.onrender.com/photos?wallet_address=${walletAddress}`);
+    if (res.ok) {
+      onUnlockSuccess(activeKey);
+    } else {
+      sessionStorage.removeItem('e2ee_master_key');
+      setStatus("❌ Từ khóa khôi phục không đúng!");
     }
   };
 
@@ -217,10 +317,10 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
         </div>
       )}
 
-      {/* ================= GIAO DIỆN CHÍNH (ĐÃ CHUYỂN SÁNG) ================= */}
+      {/* ================= GIAO DIỆN CHÍNH ================= */}
       <div className={`fixed inset-0 w-screen h-screen bg-[#F8FAFC] font-sans flex items-center justify-center overflow-hidden text-slate-800 transition-opacity duration-700 ${isStealth ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         
-        {/* NỀN LƯỚI Ô VUÔNG SÁNG MÀU (BLUEPRINT GRID SÁNG) */}
+        {/* NỀN LƯỚI Ô VUÔNG SÁNG MÀU */}
         <div 
           className="absolute inset-0 z-0 opacity-60 pointer-events-none"
           style={{
@@ -230,19 +330,17 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
           }}
         ></div>
 
-        {/* ÁNH SÁNG NỀN MỀM MẠI (GLOW) GÓC TRÊN TRÁI & DƯỚI PHẢI */}
+        {/* ÁNH SÁNG NỀN MỀM MẠI */}
         <div className="absolute top-0 left-0 w-[800px] h-[600px] bg-cyan-300/20 blur-[150px] rounded-full pointer-events-none z-0 -translate-x-1/3 -translate-y-1/3"></div>
         <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-purple-400/20 blur-[150px] rounded-full pointer-events-none z-0 translate-x-1/4 translate-y-1/4"></div>
         
         {/* ĐƯỜNG LINE SÁNG Ở CẠNH TRÊN */}
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-400 via-purple-400 to-transparent z-0"></div>
 
-        {/* KHUNG CONTENT LAYOUT CHIA 2 CỘT */}
         <div className="w-[95%] max-w-[1300px] flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-12 lg:gap-0 relative z-10">
           
           {/* ================= CỘT TRÁI: SINH TRẮC HỌC ================= */}
           <div className="flex-1 flex flex-col justify-center px-4 lg:pr-16 relative">
-            
             <div className="flex items-center gap-2 border border-cyan-200 text-cyan-700 rounded-full px-4 py-1.5 text-[10px] uppercase font-bold tracking-widest bg-cyan-50 w-fit mb-6 shadow-sm">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
               END-TO-END ENCRYPTED VAULT
@@ -252,11 +350,9 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
               HỆ THỐNG<br/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500">LƯU TRỮ ẢNH</span>
             </h1>
-            
             <p className="text-slate-500 text-[15px] mb-12">Bảo mật sinh trắc học kết hợp khóa phi tập trung.</p>
 
             <div className="relative w-full max-w-[450px] bg-white/90 border border-slate-200 rounded-2xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl">
-              
               <div className="flex justify-between items-center mb-6">
                 <span className="text-slate-500 text-[10px] font-bold tracking-widest uppercase">Biometric // Face ID</span>
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
@@ -265,7 +361,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                 </div>
               </div>
 
-              {/* MÀN HÌNH QUÉT GIỮ NỀN TỐI (Tạo độ tương phản cực đẹp cho bức ảnh Hologram) */}
               <div className="relative w-full h-[180px] border border-slate-300 bg-slate-900 rounded-xl mb-6 flex items-center justify-center overflow-hidden shadow-inner">
                 <div className="absolute inset-4 pointer-events-none z-10">
                   <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-cyan-400"></div>
@@ -274,7 +369,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                   <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-cyan-400"></div>
                 </div>
 
-                {/* ẢNH KHUÔN MẶT TỪ THƯ MỤC PUBLIC */}
                 <div className="relative z-10 flex items-center justify-center w-full h-full p-2">
                   <img 
                     src="/image_90a679.png" 
@@ -288,8 +382,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                     }}
                   />
                 </div>
-
-                {/* LASER LUÔN CHẠY KHI VÀO TRANG */}
                 <div className="absolute left-0 w-full h-[2px] bg-cyan-400 shadow-[0_0_20px_5px_#22d3ee] scan-laser-line z-20"></div>
               </div>
 
@@ -301,7 +393,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                 <span className="text-[13px] font-bold uppercase tracking-wider text-slate-600 group-hover:text-slate-900">Nhấn để quét khuôn mặt</span>
               </button>
 
-              {/* OVERLAY CHỌN KÉT TRONG KHUNG - NỀN SÁNG */}
               {showWalletList && (
                 <div className="absolute inset-0 w-full h-full bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl flex flex-col z-[100] animate-in fade-in zoom-in-95 duration-200 shadow-2xl">
                   <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
@@ -335,7 +426,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
             </div>
           </div>
 
-          {/* ================= DIVIDER GIỮA ================= */}
           <div className="hidden lg:flex flex-col items-center justify-center relative w-16 h-[500px] shrink-0">
               <div className="w-[1px] h-full bg-gradient-to-b from-transparent via-slate-200 to-transparent"></div>
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white border border-slate-200 px-2 py-3 rounded-md text-[10px] text-slate-400 font-bold tracking-widest leading-none rotate-180 shadow-sm" style={{ writingMode: 'vertical-rl' }}>HOẶC</div>
@@ -343,7 +433,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
 
           {/* ================= CỘT PHẢI: FORMS ================= */}
           <div className="flex-1 flex flex-col justify-center px-4 lg:pl-16 gap-6 relative z-20">
-            
             <div className="flex flex-col gap-3">
               <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between hover:border-purple-300 transition-colors group cursor-pointer shadow-sm hover:shadow-md" onClick={generateRandomSeed}>
                 <div className="flex items-center gap-5">
@@ -360,7 +449,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                 </div>
               </div>
 
-              {/* KHUNG CẢNH BÁO LƯU 5 CHỮ */}
               {showSeedWarning && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 shadow-sm">
                   <span className="text-amber-500 text-base leading-none mt-0.5">⚠️</span>
@@ -376,7 +464,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
             </div>
 
             <div className="bg-white/90 backdrop-blur-xl border border-slate-200 rounded-[24px] p-8 shadow-xl relative">
-              
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-2 text-slate-600">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg>
@@ -447,6 +534,48 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
           </div>
         </div>
       </div>
+
+      {/* ================= MODAL NHẬP OTP BẢO MẬT ================= */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mb-6 border border-rose-100">
+              <span className="text-3xl">🛡️</span>
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">Bảo Vệ Đa Thiết Bị</h3>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              Phát hiện đăng nhập từ thiết bị mới. Chúng tôi đã gửi một mã xác thực (OTP) tới email bảo mật của bạn. 
+            </p>
+            
+            <div className="w-full relative mb-6">
+              <input
+                type="text"
+                placeholder="Nhập 6 số OTP..."
+                value={otpInput}
+                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="w-full text-center text-2xl font-bold tracking-[0.5em] bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all shadow-inner"
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex w-full gap-3">
+              <button
+                onClick={() => { setShowOtpModal(false); setStatus(''); }}
+                className="flex-1 py-3 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all font-semibold active:scale-95"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                onClick={handleVerifyOtp}
+                disabled={isSendingOtp}
+                className="flex-[2] py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all font-bold shadow-lg shadow-indigo-500/30 active:scale-95 disabled:opacity-50"
+              >
+                {isSendingOtp ? "Đang xử lý..." : "Xác Nhận & Đăng Nhập"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* THÔNG BÁO LỖI/THÀNH CÔNG */}
       {status && (
