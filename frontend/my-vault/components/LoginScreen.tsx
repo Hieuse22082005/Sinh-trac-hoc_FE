@@ -226,8 +226,14 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
   };
 
   const executeFinalLogin = async (activeKey: string, walletAddress: string, deviceId: string) => {
-    // Cập nhật Database để ghi nhận thiết bị này (Phòng trường hợp Két mới tạo)
-    await supabase.from('passkeys').update({ active_device_id: deviceId }).eq('wallet_address', walletAddress);
+    // Kiểm tra xem Két đã có dòng dữ liệu trên bảng passkeys chưa
+    const { data: existing } = await supabase.from('passkeys').select('wallet_address').eq('wallet_address', walletAddress).single();
+    
+    if (existing) {
+      await supabase.from('passkeys').update({ active_device_id: deviceId }).eq('wallet_address', walletAddress);
+    } else {
+      await supabase.from('passkeys').insert({ wallet_address: walletAddress, active_device_id: deviceId });
+    }
     
     // Lưu session khóa E2EE
     sessionStorage.setItem('e2ee_master_key', walletAddress); 

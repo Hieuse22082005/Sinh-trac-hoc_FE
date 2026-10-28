@@ -241,10 +241,23 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     if (!email) return;
 
     showStatus("Đang lưu email...", 0);
-    const { error } = await supabase
-      .from('passkeys')
-      .update({ recovery_email: email.trim() })
-      .eq('wallet_address', walletAddress);
+    const currentDeviceId = localStorage.getItem('device_id');
+
+    // Kiểm tra Két đã tồn tại chưa
+    const { data: existing } = await supabase.from('passkeys').select('wallet_address').eq('wallet_address', walletAddress).single();
+    
+    let error;
+    if (existing) {
+      const res = await supabase.from('passkeys').update({ recovery_email: email.trim() }).eq('wallet_address', walletAddress);
+      error = res.error;
+    } else {
+      const res = await supabase.from('passkeys').insert({ 
+        wallet_address: walletAddress, 
+        recovery_email: email.trim(),
+        active_device_id: currentDeviceId
+      });
+      error = res.error;
+    }
 
     if (error) {
       showStatus(`❌ Lỗi: ${error.message}`);
