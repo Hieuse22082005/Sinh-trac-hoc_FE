@@ -424,18 +424,28 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     
     try {
       const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
+      
       if (response.ok) {
-        localStorage.setItem('sys_del_pass', pass); // Lưu lại nếu đúng
+        localStorage.setItem('sys_del_pass', pass); 
         setImages(prev => prev.filter(img => img.filename !== filename));
         setTrashList(trashList.filter(t => t.filename !== filename));
         localStorage.setItem(`trash_${walletAddress}`, JSON.stringify(trashList.filter(t => t.filename !== filename)));
         showStatus("✅ Đã xóa vĩnh viễn!");
       } else {
-        // XÓA NGAY MẬT KHẨU SAI TRONG CACHE ĐỂ LẦN SAU HỆ THỐNG HIỆN LẠI BẢNG HỎI
-        localStorage.removeItem('sys_del_pass');
-        showStatus("❌ Sai mật khẩu hệ thống! Vui lòng thử lại.");
+        localStorage.removeItem('sys_del_pass'); // Xóa cache
+        if (response.status === 403) {
+          showStatus("❌ Sai mật khẩu hệ thống! Vui lòng thử lại.");
+        } else {
+          // Bắt và hiển thị lỗi thật sự từ Backend (Lỗi 500)
+          const errData = await response.json();
+          alert(`LỖI MÁY CHỦ: ${errData.detail}`); 
+          showStatus("❌ Lỗi hệ thống, xem thông báo!");
+        }
       }
-    } catch (error) {}
+    } catch (error) {
+      localStorage.removeItem('sys_del_pass');
+      showStatus("❌ Không thể kết nối đến máy chủ Render!");
+    }
   };
 
   const toggleSelectFile = (filename: string) => {
@@ -460,6 +470,8 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       showStatus(`Đang tiêu hủy ${selectedFiles.length} file...`, 0);
       
       let hasError = false;
+      let lastErrorMessage = "";
+
       for (const filename of selectedFiles) {
         try {
           const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
@@ -468,14 +480,23 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
              setTrashList(prev => prev.filter(t => t.filename !== filename));
           } else {
              hasError = true;
+             if (response.status === 403) {
+               lastErrorMessage = "Sai mật khẩu hệ thống!";
+             } else {
+               const errData = await response.json();
+               lastErrorMessage = `Lỗi Server: ${errData.detail}`;
+             }
           }
-        } catch (error) { hasError = true; }
+        } catch (error) { 
+           hasError = true; 
+           lastErrorMessage = "Mất kết nối Server!";
+        }
       }
 
       if (hasError) {
-         // NẾU CÓ LỖI DO SAI MẬT KHẨU -> XÓA CACHE ĐỂ BUỘC NHẬP LẠI VÀO LẦN SAU
          localStorage.removeItem('sys_del_pass'); 
-         showStatus("❌ Sai mật khẩu hệ thống! Vui lòng thử lại.");
+         alert(lastErrorMessage); // Bật popup báo lỗi thật
+         showStatus("❌ Có lỗi xảy ra khi tiêu hủy!");
       } else {
          localStorage.setItem('sys_del_pass', pass);
          setSelectedFiles([]);
