@@ -113,9 +113,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     localStorage.setItem('vault_theme', newTheme);
   };
 
-  // =========================================================================
-  // BƯỚC 1: LẤY ẢNH TỪ SUPABASE STORAGE VÀ GIẢI MÃ
-  // =========================================================================
   const fetchImages = async () => {
     try {
       const res = await fetch(`https://sinh-trac-hoc-be.onrender.com/photos?wallet_address=${walletAddress}`);
@@ -130,15 +127,11 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
           processedImages.push({ filename: item.filename, src: null, thumb: decryptedThumb, originalThumb: decryptedThumb, is_private: true });
         } else {
           try {
-            // Lấy link trực tiếp từ Bucket vault_images
-            // Nếu item.filename của bạn đã chứa cả thư mục ví (ví dụ: wallet_address/uuid.enc)
             const { data: { publicUrl } } = supabase.storage.from('vault_images').getPublicUrl(item.filename);
             
-            // Tải file mã hóa về (từ link Supabase)
             const fileRes = await fetch(publicUrl);
             if (fileRes.ok) {
               const blob = await fileRes.blob();
-              // Giải mã thành ảnh thật (Base64)
               const base64Data = await decryptFile(blob, masterKeyString);
               processedImages.push({ filename: item.filename, src: base64Data, thumb: null, originalThumb: null, is_private: false });
             }
@@ -355,27 +348,39 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       formData.append('is_private', makePrivate ? 'true' : 'false');
       formData.append('thumbnail', encryptedThumb);
       formData.append('wallet_address', walletAddress); 
-      await fetch('https://sinh-trac-hoc-be.onrender.com/upload', { method: 'POST', body: formData });
       
-      const sysDeletePass = process.env.NEXT_PUBLIC_DELETE_PASSWORD || 'admin123';
-      await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${item.filename}?delete_pass=${sysDeletePass}`, { method: 'DELETE' });
-      fetchImages(); 
-      showStatus(makePrivate ? "✅ Đã khóa tuyệt mật!" : "✅ Đã chuyển thành công khai!");
+      const response = await fetch('https://sinh-trac-hoc-be.onrender.com/upload', { method: 'POST', body: formData });
+      if (response.ok) {
+        const resData = await response.json();
+        const newFilename = resData.filename || resData.file_name;
+        
+        // GIỮ NGUYÊN TÊN HIỂN THỊ (ALIAS)
+        const currentAlias = aliases[item.filename];
+        if (currentAlias && newFilename) {
+           const newAliases: Record<string, string> = { ...aliases, [newFilename]: currentAlias };
+           delete newAliases[item.filename];
+           setAliases(newAliases);
+           localStorage.setItem(`aliases_${walletAddress}`, JSON.stringify(newAliases));
+        }
+
+        const sysDeletePass = process.env.NEXT_PUBLIC_DELETE_PASSWORD || 'admin123';
+        await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${item.filename}?delete_pass=${sysDeletePass}`, { method: 'DELETE' });
+        
+        fetchImages(); 
+        showStatus(makePrivate ? "✅ Đã khóa tuyệt mật!" : "✅ Đã chuyển thành công khai!");
+      } else {
+        throw new Error("Upload failed");
+      }
     } catch (error) { showStatus("❌ Lỗi chuyển đổi!"); }
   };
 
-  // =========================================================================
-  // BƯỚC 2: MỞ KHÓA ẢNH TUYỆT MẬT TỪ SUPABASE
-  // =========================================================================
   const handleUnlockSinglePrivate = async (filename: string, specificKey: string) => {
     showStatus(`Đang giải mã...`, 0);
     try {
-      // Lấy link trực tiếp từ Bucket
       const { data: { publicUrl } } = supabase.storage.from('vault_images').getPublicUrl(filename);
       const fileRes = await fetch(publicUrl);
       const blob = await fileRes.blob();
       
-      // Giải mã bằng mật khẩu cấp 2
       const base64Data = await decryptFile(blob, specificKey);
       setImages(prev => prev.map(img => img.filename === filename ? { ...img, src: base64Data, originalThumb: img.thumb, thumb: null } : img));
       showStatus("✅ Mở khóa thành công!");
@@ -496,7 +501,9 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
   const isVideoFile = (item: SecureImage) => {
     if (item.src && item.src.startsWith('data:video')) return true;
-    if (item.filename.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) return true;
+    // Nhận diện Video kể cả khi bị khóa dựa vào tên Alias (đuôi file gốc)
+    const displayName = aliases[item.filename] || item.filename;
+    if (displayName.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) return true;
     return false;
   };
 
@@ -700,18 +707,49 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4 z-10 pointer-events-auto">
                     <div className="flex justify-between">
-                      <input 
-                        type="checkbox" checked={selectedFiles.includes(item.filename)}
-                        onChange={(e) => { e.stopPropagation(); toggleSelectFile(item.filename); }}
-                        className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95"
-                      />
+                      {/* CHỈ HIỆN CHECKBOX KHI ĐÃ ĐƯỢC MỞ KHÓA HOẶC LÀ ẢNH CÔNG KHAI */}
+                      {(!item.is_private || item.src) ? (
+                        <input 
+                          type="checkbox" checked={selectedFiles.includes(item.filename)}
+                          onChange={(e) => { e.stopPropagation(); toggleSelectFile(item.filename); }}
+                          className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95"
+                        />
+                      ) : (
+                        <div className="w-5 h-5"></div>
+                      )}
+                      
                       <div className="flex gap-2">
-                        {activeTab !== 'all' && activeTab !== 'favorites' && activeTab !== 'trash' ? (
-                          <button onClick={(e) => { e.stopPropagation(); handleRemoveFromCollection(activeTab, item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Rút khỏi Bộ sưu tập này">➖</button>
-                        ) : activeTab === 'all' ? (
-                          <button onClick={(e) => { e.stopPropagation(); setShowColMenuFor(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-indigo-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Thêm vào Bộ sưu tập">📁</button>
-                        ) : null}
+                        {/* ẨN TOÀN BỘ NÚT CHỨC NĂNG NẾU ĐANG BỊ KHÓA */}
+                        {(!item.is_private || item.src) && (
+                          <>
+                            {activeTab !== 'all' && activeTab !== 'favorites' && activeTab !== 'trash' ? (
+                              <button onClick={(e) => { e.stopPropagation(); handleRemoveFromCollection(activeTab, item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Rút khỏi Bộ sưu tập này">➖</button>
+                            ) : activeTab === 'all' ? (
+                              <button onClick={(e) => { e.stopPropagation(); setShowColMenuFor(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-indigo-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Thêm vào Bộ sưu tập">📁</button>
+                            ) : null}
 
+                            {item.is_private && item.src && activeTab !== 'trash' && (
+                               <button onClick={(e) => { e.stopPropagation(); if(window.confirm("Bỏ lớp bảo vệ và chuyển file này thành CÔNG KHAI?")) handleChangePrivacy(item, false); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-blue-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Bỏ mã hóa, chuyển thành Công Khai">🌍</button>
+                            )}
+
+                            {activeTab !== 'trash' && (
+                              <button onClick={(e) => { e.stopPropagation(); toggleFavorite(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-xs transition-all shadow-xl hover:scale-110 active:scale-90">
+                                {favorites.includes(item.filename) ? '❤️' : '🤍'}
+                              </button>
+                            )}
+                            
+                            {activeTab !== 'trash' ? (
+                              <button onClick={(e) => { e.stopPropagation(); handleSoftDelete(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Chuyển vào thùng rác">🗑️</button>
+                            ) : (
+                              <>
+                                <button onClick={(e) => { e.stopPropagation(); handleRestore(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-emerald-500 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Khôi phục">♻️</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleHardDelete(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-600 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Xóa vĩnh viễn">☠️</button>
+                              </>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* NÚT KHÓA/MỞ KHÓA LUÔN HIỂN THỊ */}
                         {activeTab !== 'trash' && (
                           <button 
                             onClick={async (e) => { 
@@ -731,25 +769,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                           >
                             {item.is_private ? (item.src ? '🔓' : '🔒') : '🔓'}
                           </button>
-                        )}
-                        
-                        {item.is_private && item.src && activeTab !== 'trash' && (
-                           <button onClick={(e) => { e.stopPropagation(); if(window.confirm("Bỏ lớp bảo vệ và chuyển file này thành CÔNG KHAI?")) handleChangePrivacy(item, false); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-blue-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Bỏ mã hóa, chuyển thành Công Khai">🌍</button>
-                        )}
-
-                        {activeTab !== 'trash' && (
-                          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-xs transition-all shadow-xl hover:scale-110 active:scale-90">
-                            {favorites.includes(item.filename) ? '❤️' : '🤍'}
-                          </button>
-                        )}
-                        
-                        {activeTab !== 'trash' ? (
-                          <button onClick={(e) => { e.stopPropagation(); handleSoftDelete(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Chuyển vào thùng rác">🗑️</button>
-                        ) : (
-                          <>
-                            <button onClick={(e) => { e.stopPropagation(); handleRestore(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-emerald-500 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Khôi phục">♻️</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleHardDelete(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-600 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Xóa vĩnh viễn">☠️</button>
-                          </>
                         )}
                       </div>
                     </div>
