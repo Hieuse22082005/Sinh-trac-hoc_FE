@@ -6,7 +6,6 @@ import { generateBlurredThumbnail } from '../utils/mediaHelper';
 import type { SecureImage } from '../types';
 import { startRegistration } from '@simplewebauthn/browser';
 import { ShieldCheck } from "lucide-react";
-// ĐẢM BẢO BẠN ĐÃ IMPORT SUPABASE CLIENT
 import { supabase } from '@/lib/supabaseClient';
 
 const AUTO_LOCK_TIMEOUT = 3 * 60 * 1000;
@@ -31,7 +30,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [showColMenuFor, setShowColMenuFor] = useState<string | null>(null);
 
-  // STATE CHO HỘP THOẠI NHẬP TÙY CHỈNH MỚI (THAY THẾ WINDOW.PROMPT)
   const [promptData, setPromptData] = useState<{
     isOpen: boolean; message: string; isPassword: boolean; defaultValue: string; resolve: ((value: string | null) => void) | null;
   }>({ isOpen: false, message: '', isPassword: false, defaultValue: '', resolve: null });
@@ -41,11 +39,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
   const fileInputRef = useRef<HTMLInputElement>(null);
   const walletAddress = CryptoJS.SHA256(masterKeyString).toString();
 
-  // =========================================================================
-  // BƯỚC 5: LẮNG NGHE SUPABASE REALTIME ĐỂ ĐÁ THIẾT BỊ KHÁC
-  // =========================================================================
   useEffect(() => {
-    // Lấy thông tin thiết bị hiện tại đã lưu ở màn hình Login
     const currentDeviceId = localStorage.getItem('device_id'); 
     const currentWalletAddress = localStorage.getItem('wallet_address');
 
@@ -58,18 +52,15 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'passkeys', // Lắng nghe bảng passkeys
-          filter: `wallet_address=eq.${currentWalletAddress}`, // Chỉ nghe đúng Két đang mở
+          table: 'passkeys', 
+          filter: `wallet_address=eq.${currentWalletAddress}`, 
         },
         (payload) => {
-          // Nếu active_device_id trên DB thay đổi và KHÁC với máy đang cầm
           if (payload.new.active_device_id && payload.new.active_device_id !== currentDeviceId) {
-            // Xóa khóa giải mã và session
             sessionStorage.removeItem('e2ee_master_key'); 
             localStorage.clear(); 
             
             alert('Cảnh báo: Tài khoản đã được truy cập từ thiết bị khác. Bạn đã bị đăng xuất!');
-            // Reload trang để quay về Login
             window.location.reload(); 
           }
         }
@@ -80,14 +71,12 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       supabase.removeChannel(channel);
     };
   }, []);
-  // =========================================================================
 
   const showStatus = (msg: string, timeout = 3000) => {
     setStatus(msg);
     if (timeout > 0) setTimeout(() => setStatus(''), timeout);
   };
 
-  // HÀM GỌI HỘP THOẠI NHẬP LIỆU
   const askPrompt = (message: string, isPassword = false, defaultValue = ""): Promise<string | null> => {
     setPromptInput(defaultValue);
     setShowPasswordToggle(!isPassword); 
@@ -124,6 +113,9 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     localStorage.setItem('vault_theme', newTheme);
   };
 
+  // =========================================================================
+  // BƯỚC 1: LẤY ẢNH TỪ SUPABASE STORAGE VÀ GIẢI MÃ
+  // =========================================================================
   const fetchImages = async () => {
     try {
       const res = await fetch(`https://sinh-trac-hoc-be.onrender.com/photos?wallet_address=${walletAddress}`);
@@ -138,9 +130,15 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
           processedImages.push({ filename: item.filename, src: null, thumb: decryptedThumb, originalThumb: decryptedThumb, is_private: true });
         } else {
           try {
-            const fileRes = await fetch(`https://sinh-trac-hoc-be.onrender.com/download/${item.filename}`);
+            // Lấy link trực tiếp từ Bucket vault_images
+            const { data: { publicUrl } } = supabase.storage.from('vault_images').getPublicUrl(item.filename);
+            
+            // Tải file mã hóa về (từ link Supabase)
+            const fileRes = await fetch(publicUrl);
             if (fileRes.ok) {
-              const base64Data = await decryptFile(await fileRes.blob(), masterKeyString);
+              const blob = await fileRes.blob();
+              // Giải mã thành ảnh thật (Base64)
+              const base64Data = await decryptFile(blob, masterKeyString);
               processedImages.push({ filename: item.filename, src: base64Data, thumb: null, originalThumb: null, is_private: false });
             }
           } catch (err) {}
@@ -222,7 +220,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       const resOpt = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, vault_name: finalName }) });
       const options = await resOpt.json();
       
-      // ĐÃ SỬA: Bọc options trong optionsJSON
       const attResp = await startRegistration({ optionsJSON: options }); 
       
       const resVerify = await fetch('https://sinh-trac-hoc-be.onrender.com/webauthn/register/verify', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wallet_address: walletAddress, credential: attResp }) });
@@ -235,12 +232,10 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     } catch (error) { showStatus("❌ Hủy đăng ký."); }
   };
 
-  // HÀM ĐĂNG KÝ EMAIL MỚI THÊM
   const handleRegisterEmail = async () => {
     showStatus("Đang kiểm tra dữ liệu Két...", 0);
     
     try {
-      // Dùng .maybeSingle() thay cho .single() để an toàn tuyệt đối
       const { data: existing, error: checkError } = await supabase
         .from('passkeys')
         .select('recovery_email')
@@ -249,7 +244,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
       if (checkError) throw checkError;
 
-      // NẾU ĐÃ CÓ EMAIL -> CHẶN LẠI VÀ THOÁT NGAY
       if (existing && existing.recovery_email) {
         showStatus("⚠️ Két sắt này đã được liên kết Email từ trước. Không thể ghi đè!");
         return;
@@ -258,7 +252,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       console.error("Lỗi kiểm tra két:", err);
     }
 
-    // NẾU CHƯA CÓ EMAIL -> MỞ BẢNG NHẬP LIỆU
     const email = await askPrompt("Nhập địa chỉ Email bảo mật (Dùng để nhận OTP):", false);
     if (!email) return;
 
@@ -370,11 +363,19 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     } catch (error) { showStatus("❌ Lỗi chuyển đổi!"); }
   };
 
+  // =========================================================================
+  // BƯỚC 2: MỞ KHÓA ẢNH TUYỆT MẬT TỪ SUPABASE
+  // =========================================================================
   const handleUnlockSinglePrivate = async (filename: string, specificKey: string) => {
     showStatus(`Đang giải mã...`, 0);
     try {
-      const fileRes = await fetch(`https://sinh-trac-hoc-be.onrender.com/download/${filename}`);
-      const base64Data = await decryptFile(await fileRes.blob(), specificKey);
+      // Lấy link trực tiếp từ Bucket
+      const { data: { publicUrl } } = supabase.storage.from('vault_images').getPublicUrl(filename);
+      const fileRes = await fetch(publicUrl);
+      const blob = await fileRes.blob();
+      
+      // Giải mã bằng mật khẩu cấp 2
+      const base64Data = await decryptFile(blob, specificKey);
       setImages(prev => prev.map(img => img.filename === filename ? { ...img, src: base64Data, originalThumb: img.thumb, thumb: null } : img));
       showStatus("✅ Mở khóa thành công!");
     } catch (error) { showStatus("❌ Sai mật khẩu!"); }
@@ -587,7 +588,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 {isDark ? '🌞' : '🌙'}
               </button>
               
-              {/* NÚT ĐĂNG KÝ EMAIL */}
               <button onClick={handleRegisterEmail} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>✉️ Email OTP</button>
 
               <button onClick={handleRegisterFaceID} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>📸 FaceID</button>
@@ -785,7 +785,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         </main>
       </div>
 
-      {/* POPUP BỘ SƯU TẬP (GIỮ GIAO DIỆN TỐI) */}
       {showColMenuFor && (
         <div className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowColMenuFor(null)}>
           <div className="bg-[#13161E] border border-white/10 rounded-3xl p-8 w-full max-w-sm shadow-2xl scale-100 transition-transform" onClick={e => e.stopPropagation()}>
@@ -810,7 +809,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         </div>
       )}
 
-      {/* POPUP NHẬP LIỆU BẢO MẬT (THAY THẾ WINDOW.PROMPT) */}
       {promptData.isOpen && (
         <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in zoom-in-95 duration-200">
           <div className="bg-[#13161E] border border-slate-700/50 rounded-2xl p-6 w-full max-w-md shadow-[0_0_50px_rgba(0,0,0,0.8)]">
@@ -863,7 +861,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         </div>
       )}
 
-      {/* Lightbox Xem Ảnh/Video */}
       {viewingImage && (
         <div className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-8 backdrop-blur-3xl animate-in fade-in duration-200" onClick={() => setViewingImage(null)}>
           <button onClick={() => setViewingImage(null)} className="absolute top-6 right-8 text-slate-400 hover:text-white text-5xl font-light hover:scale-125 active:scale-90 transition-all">&times;</button>
