@@ -2,7 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import CryptoJS from 'crypto-js';
 import { startAuthentication } from '@simplewebauthn/browser';
-import { supabase } from '@/lib/supabaseClient'; // Đảm bảo import Supabase
+import { supabase } from '@/lib/supabaseClient'; // Đảm bảo đường dẫn import Supabase đúng với dự án của bạn
+import OTPVerification from './OTPVerification';
 
 const WORD_LIST = ["apple", "bear", "cat", "dog", "eagle", "fire", "gold", "hero", "iron", "jump", "king", "lion", "moon", "nest", "ocean", "pine", "queen", "rose", "star", "tree", "unit", "vine", "wolf", "xray", "yarn", "zero", "sun", "sky", "sea", "wind", "rain"];
 
@@ -26,10 +27,9 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
 
   // STATE CHO OTP
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpInput, setOtpInput] = useState('');
   const [pendingKey, setPendingKey] = useState('');
   const [pendingWallet, setPendingWallet] = useState('');
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const masterKeyString = seedWords.join(' ').trim().toLowerCase();
@@ -165,6 +165,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
         // 1. MỞ BẢNG NHẬP OTP NGAY LẬP TỨC (Không đợi gọi API)
         setPendingKey(activeKey);
         setPendingWallet(walletAddress);
+        setRecoveryEmail(passkeyData.recovery_email);
         setShowOtpModal(true);
         setStatus("Đang gửi mã OTP đến email của bạn...");
 
@@ -177,7 +178,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
           });
 
           if (!otpRes.ok) {
-            // Chỉ cảnh báo nhẹ chứ không return để khóa giao diện
             setStatus("⚠️ Máy chủ mail bận. Hãy lấy mã 6 số từ Supabase!");
           } else {
             setStatus("✅ Vui lòng kiểm tra email của bạn.");
@@ -197,43 +197,9 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
     }
   };
 
-  const handleVerifyOtp = async () => {
-    if (!otpInput || otpInput.length < 6) return setStatus("❌ Vui lòng nhập đủ mã OTP");
-    
-    setIsSendingOtp(true);
-    setStatus("Đang xác thực OTP...");
-    try {
-      const currentDeviceId = localStorage.getItem('device_id')!;
-      
-      const verifyRes = await fetch('https://sinh-trac-hoc-be.onrender.com/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          wallet_address: pendingWallet,
-          otp_code: otpInput.trim(),
-          new_device_id: currentDeviceId
-        })
-      });
-
-      if (verifyRes.ok) {
-        setShowOtpModal(false);
-        setOtpInput('');
-        setStatus("✅ Xác thực thành công!");
-        await executeFinalLogin(pendingKey, pendingWallet, currentDeviceId);
-      } else {
-        const err = await verifyRes.json();
-        setStatus(`❌ ${err.detail || "OTP không hợp lệ"}`);
-      }
-    } catch (error) {
-      setStatus("❌ Lỗi kết nối máy chủ");
-    } finally {
-      setIsSendingOtp(false);
-    }
-  };
-
   const executeFinalLogin = async (activeKey: string, walletAddress: string, deviceId: string) => {
     // Kiểm tra xem Két đã có dòng dữ liệu trên bảng passkeys chưa
-    const { data: existing } = await supabase.from('passkeys').select('wallet_address').eq('wallet_address', walletAddress).single();
+    const { data: existing } = await supabase.from('passkeys').select('wallet_address').eq('wallet_address', walletAddress).maybeSingle();
     
     if (existing) {
       await supabase.from('passkeys').update({ active_device_id: deviceId }).eq('wallet_address', walletAddress);
@@ -547,45 +513,51 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
         </div>
       </div>
 
-      {/* ================= MODAL NHẬP OTP BẢO MẬT ================= */}
+      {/* ================= MODAL NHẬP OTP BẢO MẬT MỚI (6 SỐ CAO CẤP) ================= */}
       {showOtpModal && (
-        <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in zoom-in-95 duration-200">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
-            <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mb-6 border border-rose-100">
-              <span className="text-3xl">🛡️</span>
-            </div>
-            <h3 className="text-xl font-extrabold text-slate-900 mb-2">Bảo Vệ Đa Thiết Bị</h3>
-            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-              Phát hiện đăng nhập từ thiết bị mới. Chúng tôi đã gửi một mã xác thực (OTP) tới email bảo mật của bạn. 
-            </p>
-            
-            <div className="w-full relative mb-6">
-              <input
-                type="text"
-                placeholder="Nhập 6 số OTP..."
-                value={otpInput}
-                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="w-full text-center text-2xl font-bold tracking-[0.5em] bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all shadow-inner"
-                autoFocus
-              />
-            </div>
-            
-            <div className="flex w-full gap-3">
-              <button
-                onClick={() => { setShowOtpModal(false); setStatus(''); }}
-                className="flex-1 py-3 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all font-semibold active:scale-95"
-              >
-                Hủy Bỏ
-              </button>
-              <button
-                onClick={handleVerifyOtp}
-                disabled={isSendingOtp}
-                className="flex-[2] py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all font-bold shadow-lg shadow-indigo-500/30 active:scale-95 disabled:opacity-50"
-              >
-                {isSendingOtp ? "Đang xử lý..." : "Xác Nhận & Đăng Nhập"}
-              </button>
-            </div>
-          </div>
+        <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <OTPVerification 
+            userEmail={recoveryEmail || "email bảo mật của bạn"}
+            onComplete={async (code: string) => {
+              try {
+                const currentDeviceId = localStorage.getItem('device_id')!;
+                const verifyRes = await fetch('https://sinh-trac-hoc-be.onrender.com/verify-otp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    wallet_address: pendingWallet, 
+                    otp_code: code, 
+                    new_device_id: currentDeviceId 
+                  })
+                });
+                
+                if (verifyRes.ok) {
+                  // Đợi 1.5s để hiệu ứng "Thành công" màu xanh lá chạy xong
+                  setTimeout(async () => {
+                    setShowOtpModal(false);
+                    setStatus("✅ Xác thực thành công!");
+                    await executeFinalLogin(pendingKey, pendingWallet, currentDeviceId);
+                  }, 1500);
+                  return true; 
+                } else {
+                  const err = await verifyRes.json();
+                  setStatus(`❌ ${err.detail || "OTP không hợp lệ"}`);
+                  return false; // Sai mã sẽ tự kích hoạt hiệu ứng rung màu đỏ
+                }
+              } catch (error) {
+                setStatus("❌ Lỗi kết nối máy chủ");
+                return false; 
+              }
+            }}
+            onResend={() => {
+              fetch('https://sinh-trac-hoc-be.onrender.com/request-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet_address: pendingWallet })
+              });
+              setStatus("Đã yêu cầu gửi lại OTP.");
+            }}
+          />
         </div>
       )}
 
