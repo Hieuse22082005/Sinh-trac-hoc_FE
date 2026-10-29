@@ -237,6 +237,21 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
   // HÀM ĐĂNG KÝ EMAIL MỚI THÊM
   const handleRegisterEmail = async () => {
+    // 1. KIỂM TRA TRẠNG THÁI LIÊN KẾT CỦA VÍ HIỆN TẠI
+    showStatus("Đang kiểm tra dữ liệu Két...", 0);
+    const { data: existing, error: checkError } = await supabase
+      .from('passkeys')
+      .select('recovery_email')
+      .eq('wallet_address', walletAddress)
+      .single();
+
+    // 2. NẾU ĐÃ CÓ EMAIL -> CHẶN LẠI VÀ THOÁT NGAY
+    if (existing && existing.recovery_email) {
+      showStatus("⚠️ Két sắt này đã được liên kết Email từ trước. Không thể ghi đè!");
+      return;
+    }
+
+    // 3. NẾU CHƯA CÓ EMAIL -> MỞ BẢNG NHẬP LIỆU
     const email = await askPrompt("Nhập địa chỉ Email bảo mật (Dùng để nhận OTP):", false);
     if (!email) return;
 
