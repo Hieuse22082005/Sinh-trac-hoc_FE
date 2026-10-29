@@ -111,7 +111,7 @@ const OTPInputBox = ({
 
   useEffect(() => {
     if (state === "success") {
-      const transitionX = index * 52;
+      const transitionX = index * 52; 
       animationControls.start({
         x: -transitionX,
         transition: slowSuccessTransition,
@@ -155,9 +155,9 @@ const OTPInputBox = ({
   const onPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData("text").trim().slice(0, 6);
-    const digits = pastedData.split("").filter((char) => /^[0-9]$/.test(char));
+    const digits = pastedData.split("").filter((char: string) => /^[0-9]$/.test(char));
 
-    digits.forEach((digit, i) => {
+    digits.forEach((digit: string, i: number) => {
       const targetIndex = index + i;
       if (targetIndex < 6) {
         const input = document.getElementById(`input-${targetIndex}`) as HTMLInputElement | null;
@@ -175,12 +175,12 @@ const OTPInputBox = ({
 
   return (
     <motion.div
-      className={`w-10 sm:w-11 h-14 rounded-lg ring-2 ring-transparent focus-within:shadow-inner overflow-hidden transition-all duration-300 ${
+      className={`w-10 sm:w-11 h-14 rounded-xl border-2 overflow-hidden transition-all duration-300 shadow-sm ${
         state === "error"
-          ? "ring-red-400 dark:ring-red-500"
+          ? "border-rose-400 bg-rose-50"
           : state === "success"
-            ? "ring-green-500 bg-green-500 text-white"
-            : "focus-within:ring-purple-400 dark:focus-within:ring-purple-500 ring-gray-200 dark:ring-gray-700 bg-white"
+            ? "border-emerald-500 bg-emerald-500 text-white"
+            : "border-slate-200 bg-slate-100 hover:border-slate-300 hover:bg-slate-200 focus-within:border-purple-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-purple-100"
       }`}
       initial={{ opacity, y }}
       animate={animationControls}
@@ -195,7 +195,7 @@ const OTPInputBox = ({
         onPaste={onPaste}
         onFocus={onFocus}
         onBlur={onBlur}
-        className="w-full h-full text-center text-2xl sm:text-3xl font-semibold outline-none caret-purple-600 bg-transparent disabled:opacity-100 text-slate-800"
+        className="w-full h-full text-center text-2xl sm:text-3xl font-bold outline-none caret-purple-600 bg-transparent disabled:opacity-100 text-slate-800"
         disabled={state === "success"}
       />
     </motion.div>
