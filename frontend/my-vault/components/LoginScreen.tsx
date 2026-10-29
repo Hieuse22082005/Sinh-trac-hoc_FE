@@ -162,25 +162,31 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
           return;
         }
 
-        // Gọi API gửi OTP
-        setStatus("Đang gửi mã OTP đến email của bạn...");
-        const otpRes = await fetch('https://sinh-trac-hoc-be.onrender.com/request-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wallet_address: walletAddress })
-        });
-
-        if (!otpRes.ok) {
-          setStatus("❌ Lỗi gửi email OTP.");
-          return;
-        }
-
-        // Mở popup OTP
+        // 1. MỞ BẢNG NHẬP OTP NGAY LẬP TỨC (Không đợi gọi API)
         setPendingKey(activeKey);
         setPendingWallet(walletAddress);
         setShowOtpModal(true);
-        setStatus("✅ Vui lòng kiểm tra email.");
-        return;
+        setStatus("Đang gửi mã OTP đến email của bạn...");
+
+        // 2. GỌI API GỬI EMAIL TRONG KHỐI TRY/CATCH ĐỘC LẬP
+        try {
+          const otpRes = await fetch('https://sinh-trac-hoc-be.onrender.com/request-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet_address: walletAddress })
+          });
+
+          if (!otpRes.ok) {
+            // Chỉ cảnh báo nhẹ chứ không return để khóa giao diện
+            setStatus("⚠️ Máy chủ mail bận. Hãy lấy mã 6 số từ Supabase!");
+          } else {
+            setStatus("✅ Vui lòng kiểm tra email của bạn.");
+          }
+        } catch (fetchError) {
+          setStatus("⚠️ Không gọi được server mail, hãy lấy OTP từ Supabase.");
+        }
+        
+        return; // Dừng tiến trình đăng nhập thẳng, nhường quyền cho bảng OTP
       }
 
       // NẾU LÀ MÁY QUEN (HOẶC CHƯA CÓ AI ĐĂNG NHẬP) -> VÀO THẲNG
