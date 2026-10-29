@@ -157,7 +157,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     if (newName !== null && newName.trim() !== "") {
       let finalNewName = newName.trim();
       
-      // ĐẢM BẢO GIỮ ĐUÔI FILE (VD: .mp4, .png) ĐỂ NHẬN DIỆN ĐÚNG KHI KHÓA
       if (currentName.includes('.') && !finalNewName.includes('.')) {
         finalNewName += currentName.substring(currentName.lastIndexOf('.'));
       }
@@ -320,7 +319,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
            const resData = await response.json();
            const savedFilename = resData.filename || resData.file_name;
            if (savedFilename) {
-               // ĐÃ SỬA: Lưu finalFileName (có chứa đuôi file) thay vì userInput bị thiếu đuôi
                const newAliases = { ...aliases, [savedFilename]: finalFileName };
                setAliases(newAliases);
                localStorage.setItem(`aliases_${walletAddress}`, JSON.stringify(newAliases));
@@ -362,7 +360,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         const resData = await response.json();
         const newFilename = resData.filename || resData.file_name;
         
-        // ĐÃ SỬA: Lấy tên hiển thị hiện tại HOẶC tên gốc nếu chưa từng đổi tên, đảm bảo giữ đuôi .mp4
         const currentAlias = aliases[item.filename] || item.filename;
         if (newFilename) {
            const newAliases: Record<string, string> = { ...aliases, [newFilename]: currentAlias };
@@ -440,7 +437,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         localStorage.setItem(`trash_${walletAddress}`, JSON.stringify(trashList.filter(t => t.filename !== filename)));
         showStatus("✅ Đã xóa vĩnh viễn!");
       } else {
-        localStorage.removeItem('sys_del_pass'); // Xóa cache
+        localStorage.removeItem('sys_del_pass'); 
         if (response.status === 403) {
           showStatus("❌ Sai mật khẩu hệ thống! Vui lòng thử lại.");
         } else {
@@ -725,11 +722,11 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {displayImages.map((item, index) => {
                 const displayName = aliases[item.filename] || item.filename.replace('.enc', '');
+                const isSelected = selectedFiles.includes(item.filename);
                 
                 return (
-                <div key={index} className={`group relative aspect-[4/3] rounded-[1.2rem] overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:-translate-y-1 hover:shadow-2xl ${cardBg}`}>
+                <div key={index} className={`group relative aspect-[4/3] rounded-[1.2rem] overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-2xl ${cardBg} ${isSelected ? 'ring-4 ring-indigo-500 scale-[0.98]' : 'hover:-translate-y-1'}`}>
                   
-                  {/* ĐÃ SỬA: Đẩy thẻ huy hiệu sang left-12 để không đè lên Checkbox */}
                   <div className="absolute top-3 left-12 z-20 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
                     {isVideoFile(item) ? (
                       <span className="px-2.5 py-1 bg-black/70 backdrop-blur-md rounded-md border border-white/20 text-white text-[10px] font-extrabold flex items-center gap-1.5 shadow-lg">▶️ VIDEO</span>
@@ -752,11 +749,11 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4 z-10 pointer-events-auto">
+                  <div className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-black/40 transition-opacity duration-300 flex flex-col justify-between p-4 z-10 pointer-events-auto ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                     <div className="flex justify-between">
                       {(!item.is_private || item.src) ? (
                         <input 
-                          type="checkbox" checked={selectedFiles.includes(item.filename)}
+                          type="checkbox" checked={isSelected}
                           onChange={(e) => { e.stopPropagation(); toggleSelectFile(item.filename); }}
                           className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95"
                         />
