@@ -363,7 +363,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
            localStorage.setItem(`aliases_${walletAddress}`, JSON.stringify(newAliases));
         }
 
-        const sysDeletePass = process.env.NEXT_PUBLIC_DELETE_PASSWORD || 'admin123';
+        const sysDeletePass = process.env.NEXT_PUBLIC_DELETE_PASSWORD || '22082005';
         await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${item.filename}?delete_pass=${sysDeletePass}`, { method: 'DELETE' });
         
         fetchImages(); 
