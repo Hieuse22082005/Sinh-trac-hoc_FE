@@ -155,7 +155,14 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
   const handleRename = async (filename: string, currentName: string) => {
     const newName = await askPrompt("Nhập tên hiển thị mới cho file này:", false, currentName);
     if (newName !== null && newName.trim() !== "") {
-      const updatedAliases = { ...aliases, [filename]: newName.trim() };
+      let finalNewName = newName.trim();
+      
+      // ĐẢM BẢO GIỮ ĐUÔI FILE (VD: .mp4, .png) ĐỂ NHẬN DIỆN ĐÚNG KHI KHÓA
+      if (currentName.includes('.') && !finalNewName.includes('.')) {
+        finalNewName += currentName.substring(currentName.lastIndexOf('.'));
+      }
+      
+      const updatedAliases = { ...aliases, [filename]: finalNewName };
       setAliases(updatedAliases);
       localStorage.setItem(`aliases_${walletAddress}`, JSON.stringify(updatedAliases));
       showStatus("✅ Đã cập nhật tên hiển thị!");
@@ -312,8 +319,9 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         try {
            const resData = await response.json();
            const savedFilename = resData.filename || resData.file_name;
-           if (savedFilename && userInput.trim()) {
-               const newAliases = { ...aliases, [savedFilename]: userInput.trim() };
+           if (savedFilename) {
+               // ĐÃ SỬA: Lưu finalFileName (có chứa đuôi file) thay vì userInput bị thiếu đuôi
+               const newAliases = { ...aliases, [savedFilename]: finalFileName };
                setAliases(newAliases);
                localStorage.setItem(`aliases_${walletAddress}`, JSON.stringify(newAliases));
            }
@@ -354,9 +362,9 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         const resData = await response.json();
         const newFilename = resData.filename || resData.file_name;
         
-        // GIỮ NGUYÊN TÊN HIỂN THỊ (ALIAS)
-        const currentAlias = aliases[item.filename];
-        if (currentAlias && newFilename) {
+        // ĐÃ SỬA: Lấy tên hiển thị hiện tại HOẶC tên gốc nếu chưa từng đổi tên, đảm bảo giữ đuôi .mp4
+        const currentAlias = aliases[item.filename] || item.filename;
+        if (newFilename) {
            const newAliases: Record<string, string> = { ...aliases, [newFilename]: currentAlias };
            delete newAliases[item.filename];
            setAliases(newAliases);
@@ -436,7 +444,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         if (response.status === 403) {
           showStatus("❌ Sai mật khẩu hệ thống! Vui lòng thử lại.");
         } else {
-          // Bắt và hiển thị lỗi thật sự từ Backend (Lỗi 500)
           const errData = await response.json();
           alert(`LỖI MÁY CHỦ: ${errData.detail}`); 
           showStatus("❌ Lỗi hệ thống, xem thông báo!");
@@ -495,7 +502,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
       if (hasError) {
          localStorage.removeItem('sys_del_pass'); 
-         alert(lastErrorMessage); // Bật popup báo lỗi thật
+         alert(lastErrorMessage); 
          showStatus("❌ Có lỗi xảy ra khi tiêu hủy!");
       } else {
          localStorage.setItem('sys_del_pass', pass);
@@ -540,7 +547,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
   const isVideoFile = (item: SecureImage) => {
     if (item.src && item.src.startsWith('data:video')) return true;
-    // Nhận diện Video kể cả khi bị khóa dựa vào tên Alias (đuôi file gốc)
     const displayName = aliases[item.filename] || item.filename;
     if (displayName.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) return true;
     return false;
@@ -722,7 +728,9 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 
                 return (
                 <div key={index} className={`group relative aspect-[4/3] rounded-[1.2rem] overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:-translate-y-1 hover:shadow-2xl ${cardBg}`}>
-                  <div className="absolute top-3 left-3 z-20 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
+                  
+                  {/* ĐÃ SỬA: Đẩy thẻ huy hiệu sang left-12 để không đè lên Checkbox */}
+                  <div className="absolute top-3 left-12 z-20 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
                     {isVideoFile(item) ? (
                       <span className="px-2.5 py-1 bg-black/70 backdrop-blur-md rounded-md border border-white/20 text-white text-[10px] font-extrabold flex items-center gap-1.5 shadow-lg">▶️ VIDEO</span>
                     ) : (
@@ -746,7 +754,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4 z-10 pointer-events-auto">
                     <div className="flex justify-between">
-                      {/* CHỈ HIỆN CHECKBOX KHI ĐÃ ĐƯỢC MỞ KHÓA HOẶC LÀ ẢNH CÔNG KHAI */}
                       {(!item.is_private || item.src) ? (
                         <input 
                           type="checkbox" checked={selectedFiles.includes(item.filename)}
@@ -758,7 +765,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                       )}
                       
                       <div className="flex gap-2">
-                        {/* ẨN TOÀN BỘ NÚT CHỨC NĂNG NẾU ĐANG BỊ KHÓA */}
                         {(!item.is_private || item.src) && (
                           <>
                             {activeTab !== 'all' && activeTab !== 'favorites' && activeTab !== 'trash' ? (
@@ -788,7 +794,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                           </>
                         )}
                         
-                        {/* NÚT KHÓA/MỞ KHÓA LUÔN HIỂN THỊ */}
                         {activeTab !== 'trash' && (
                           <button 
                             onClick={async (e) => { 
