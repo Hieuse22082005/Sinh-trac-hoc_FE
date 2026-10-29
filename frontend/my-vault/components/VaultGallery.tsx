@@ -419,16 +419,22 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
   const handleHardDelete = async (filename: string) => {
     if (!window.confirm("⚠️ Xóa vĩnh viễn file này khỏi máy chủ? KHÔNG THỂ KHÔI PHỤC!")) return;
-    let pass = localStorage.getItem('sys_del_pass') || await askPrompt("Nhập MẬT KHẨU HỆ THỐNG:", true);
+    let pass = localStorage.getItem('sys_del_pass') || await askPrompt("Nhập MẬT KHẨU HỆ THỐNG để xóa:", true);
     if (!pass) return;
+    
     try {
       const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
       if (response.ok) {
+        localStorage.setItem('sys_del_pass', pass); // Lưu lại nếu đúng
         setImages(prev => prev.filter(img => img.filename !== filename));
         setTrashList(trashList.filter(t => t.filename !== filename));
         localStorage.setItem(`trash_${walletAddress}`, JSON.stringify(trashList.filter(t => t.filename !== filename)));
         showStatus("✅ Đã xóa vĩnh viễn!");
-      } else showStatus("❌ Sai mật khẩu hệ thống!");
+      } else {
+        // XÓA NGAY MẬT KHẨU SAI TRONG CACHE ĐỂ LẦN SAU HỆ THỐNG HIỆN LẠI BẢNG HỎI
+        localStorage.removeItem('sys_del_pass');
+        showStatus("❌ Sai mật khẩu hệ thống! Vui lòng thử lại.");
+      }
     } catch (error) {}
   };
 
@@ -449,21 +455,33 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
   const handleBatchDelete = async () => {
     if (activeTab === 'trash') {
       if (!window.confirm(`⚠️ CHẮC CHẮN TIÊU HỦY VĨNH VIỄN ${selectedFiles.length} FILE NÀY?`)) return;
-      let pass = localStorage.getItem('sys_del_pass') || await askPrompt("Nhập MẬT KHẨU HỆ THỐNG:", true);
+      let pass = localStorage.getItem('sys_del_pass') || await askPrompt("Nhập MẬT KHẨU HỆ THỐNG để xóa:", true);
       if (!pass) return;
       showStatus(`Đang tiêu hủy ${selectedFiles.length} file...`, 0);
+      
+      let hasError = false;
       for (const filename of selectedFiles) {
         try {
           const response = await fetch(`https://sinh-trac-hoc-be.onrender.com/delete/${filename}?delete_pass=${encodeURIComponent(pass)}`, { method: 'DELETE' });
           if (response.ok) {
              setImages(prev => prev.filter(img => img.filename !== filename));
              setTrashList(prev => prev.filter(t => t.filename !== filename));
+          } else {
+             hasError = true;
           }
-        } catch (error) {}
+        } catch (error) { hasError = true; }
       }
-      setSelectedFiles([]);
-      localStorage.setItem(`trash_${walletAddress}`, JSON.stringify(trashList.filter(t => !selectedFiles.includes(t.filename))));
-      showStatus("✅ Đã tiêu hủy hàng loạt!");
+
+      if (hasError) {
+         // NẾU CÓ LỖI DO SAI MẬT KHẨU -> XÓA CACHE ĐỂ BUỘC NHẬP LẠI VÀO LẦN SAU
+         localStorage.removeItem('sys_del_pass'); 
+         showStatus("❌ Sai mật khẩu hệ thống! Vui lòng thử lại.");
+      } else {
+         localStorage.setItem('sys_del_pass', pass);
+         setSelectedFiles([]);
+         localStorage.setItem(`trash_${walletAddress}`, JSON.stringify(trashList.filter(t => !selectedFiles.includes(t.filename))));
+         showStatus("✅ Đã tiêu hủy hàng loạt!");
+      }
     } else {
       const pass = await askPrompt(`🔒 NHẬP MẬT KHẨU HỆ THỐNG để chuyển ${selectedFiles.length} file vào Thùng rác:`, true);
       if (!pass) return;
