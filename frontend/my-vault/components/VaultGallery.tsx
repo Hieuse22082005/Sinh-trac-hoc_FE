@@ -131,6 +131,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         } else {
           try {
             // Lấy link trực tiếp từ Bucket vault_images
+            // Nếu item.filename của bạn đã chứa cả thư mục ví (ví dụ: wallet_address/uuid.enc)
             const { data: { publicUrl } } = supabase.storage.from('vault_images').getPublicUrl(item.filename);
             
             // Tải file mã hóa về (từ link Supabase)
