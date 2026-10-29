@@ -237,28 +237,34 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
   // HÀM ĐĂNG KÝ EMAIL MỚI THÊM
   const handleRegisterEmail = async () => {
-    // 1. KIỂM TRA TRẠNG THÁI LIÊN KẾT CỦA VÍ HIỆN TẠI
     showStatus("Đang kiểm tra dữ liệu Két...", 0);
-    const { data: existing, error: checkError } = await supabase
-      .from('passkeys')
-      .select('recovery_email')
-      .eq('wallet_address', walletAddress)
-      .single();
+    
+    try {
+      // Dùng .maybeSingle() thay cho .single() để an toàn tuyệt đối
+      const { data: existing, error: checkError } = await supabase
+        .from('passkeys')
+        .select('recovery_email')
+        .eq('wallet_address', walletAddress)
+        .maybeSingle();
 
-    // 2. NẾU ĐÃ CÓ EMAIL -> CHẶN LẠI VÀ THOÁT NGAY
-    if (existing && existing.recovery_email) {
-      showStatus("⚠️ Két sắt này đã được liên kết Email từ trước. Không thể ghi đè!");
-      return;
+      if (checkError) throw checkError;
+
+      // NẾU ĐÃ CÓ EMAIL -> CHẶN LẠI VÀ THOÁT NGAY
+      if (existing && existing.recovery_email) {
+        showStatus("⚠️ Két sắt này đã được liên kết Email từ trước. Không thể ghi đè!");
+        return;
+      }
+    } catch (err) {
+      console.error("Lỗi kiểm tra két:", err);
     }
 
-    // 3. NẾU CHƯA CÓ EMAIL -> MỞ BẢNG NHẬP LIỆU
+    // NẾU CHƯA CÓ EMAIL -> MỞ BẢNG NHẬP LIỆU
     const email = await askPrompt("Nhập địa chỉ Email bảo mật (Dùng để nhận OTP):", false);
     if (!email) return;
 
     showStatus("Đang lưu email...", 0);
     const currentDeviceId = localStorage.getItem('device_id');
 
-    // SỬ DỤNG UPSERT THAY CHO INSERT/UPDATE ĐỂ TRÁNH LỖI NULL CÁC CỘT KHÁC
     const { error } = await supabase
       .from('passkeys')
       .upsert({ 
@@ -266,7 +272,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         recovery_email: email.trim(),
         active_device_id: currentDeviceId
       }, { 
-        onConflict: 'wallet_address' // Nếu trùng địa chỉ ví thì tự động cập nhật
+        onConflict: 'wallet_address'
       });
 
     if (error) {
