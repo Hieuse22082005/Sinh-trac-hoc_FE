@@ -236,7 +236,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     showStatus("Đang kiểm tra dữ liệu Két...", 0);
     
     try {
-      // 1. Kiểm tra xem Két sắt này đã có Email bảo mật chưa
       const { data: existing, error: checkError } = await supabase
         .from('passkeys')
         .select('recovery_email')
@@ -245,7 +244,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
       if (checkError) throw checkError;
 
-      // 2. NẾU KẾT SẮT ĐÃ CÓ EMAIL TỪ TRƯỚC -> BẮT BUỘC XÁC THỰC OTP QUA EMAIL CŨ
       if (existing && existing.recovery_email) {
         const confirmUpdate = window.confirm(`⚠️ Két sắt này đang liên kết với Email: ${existing.recovery_email}\n\nBạn có muốn đổi sang Email khác không?`);
         if (!confirmUpdate) {
@@ -255,7 +253,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
         showStatus("Đang gửi mã OTP đến email cũ...", 0);
         
-        // Gọi API gửi OTP tới email cũ (Tái sử dụng API request-otp)
         try {
            const sendRes = await fetch('https://sinh-trac-hoc-be.onrender.com/request-otp', {
               method: 'POST',
@@ -268,13 +265,11 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
            return;
         }
 
-        // Bật hộp thoại nhập OTP
         const otp = await askPrompt(`Nhập mã OTP 6 số vừa được gửi đến email ${existing.recovery_email}:`, false);
         if (!otp) return;
 
         showStatus("Đang xác thực OTP...", 0);
         
-        // Gọi API xác thực OTP
         const verifyRes = await fetch('https://sinh-trac-hoc-be.onrender.com/verify-otp', {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
@@ -287,7 +282,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         }
       }
 
-      // 3. NẾU LÀ KÉT MỚI CHƯA CÓ EMAIL HOẶC ĐÃ XÁC THỰC OTP THÀNH CÔNG -> NHẬP EMAIL MỚI
       const messagePrompt = existing?.recovery_email 
         ? "Nhập địa chỉ Email MỚI muốn thay đổi:" 
         : "Tạo liên kết: Nhập địa chỉ Email bảo mật của bạn (Dùng để nhận OTP khôi phục):";
@@ -298,7 +292,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       showStatus("Đang lưu email...", 0);
       const currentDeviceId = localStorage.getItem('device_id');
 
-      // Ghi đè hoặc thêm mới email vào bảng passkeys trên Supabase
       const { error } = await supabase
         .from('passkeys')
         .upsert({ 
@@ -320,33 +313,18 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (isUploadPrivate && !uploadLevel2Key) {
-      alert("Vui lòng nhập mật khẩu tuyệt mật bên dưới trước khi chọn file!");
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    const userInput = await askPrompt("Nhập tên hiển thị cho file (Hoặc để trống để dùng tên gốc):", false, file.name);
-    if (userInput === null) {
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return; 
-    }
-
+  const uploadSingleFile = async (file: File, baseName: string) => {
     try {
-      showStatus("Đang mã hóa...", 0);
       const keyToUse = isUploadPrivate ? uploadLevel2Key : masterKeyString;
       const encryptedBlob = await encryptFile(file, keyToUse);
       let encryptedThumb = '';
+      
       if (isUploadPrivate) {
         const thumbBase64 = await generateBlurredThumbnail(file);
         if (thumbBase64) encryptedThumb = CryptoJS.AES.encrypt(thumbBase64, masterKeyString).toString();
       }
       
-      let finalFileName = userInput.trim() || file.name;
+      let finalFileName = baseName;
       if (!finalFileName.includes('.')) {
         const ext = file.name.substring(file.name.lastIndexOf('.'));
         finalFileName += ext;
@@ -364,15 +342,60 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
            const resData = await response.json();
            const savedFilename = resData.filename || resData.file_name;
            if (savedFilename) {
-               const newAliases = { ...aliases, [savedFilename]: finalFileName };
-               setAliases(newAliases);
-               localStorage.setItem(`aliases_${walletAddress}`, JSON.stringify(newAliases));
+               setAliases(prev => {
+                 const newAliases = { ...prev, [savedFilename]: finalFileName };
+                 localStorage.setItem(`aliases_${walletAddress}`, JSON.stringify(newAliases));
+                 return newAliases;
+               });
            }
         } catch(err) {}
-        showStatus("✅ Đã niêm phong!"); 
-        fetchImages(); 
+        return true;
       }
-    } catch (error) { showStatus("❌ Lỗi mã hóa!"); }
+      return false;
+    } catch (error) { 
+      return false;
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (isUploadPrivate && !uploadLevel2Key) {
+      alert("Vui lòng nhập mật khẩu tuyệt mật bên dưới trước khi chọn file!");
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const totalFiles = files.length;
+
+    if (totalFiles === 1) {
+      const file = files[0];
+      const userInput = await askPrompt("Nhập tên hiển thị cho file (Hoặc để trống để dùng tên gốc):", false, file.name);
+      if (userInput === null) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return; 
+      }
+      showStatus("Đang mã hóa...", 0);
+      await uploadSingleFile(file, userInput.trim() || file.name);
+      showStatus("✅ Đã niêm phong!"); 
+      fetchImages();
+    } 
+    else {
+      let successCount = 0;
+      showStatus(`Đang mã hóa và tải lên ${totalFiles} file...`, 0);
+      
+      for (let i = 0; i < totalFiles; i++) {
+        const file = files[i];
+        showStatus(`Đang xử lý ${i + 1}/${totalFiles}...`, 0); 
+        const isSuccess = await uploadSingleFile(file, file.name);
+        if (isSuccess) successCount++;
+      }
+      
+      showStatus(`✅ Đã niêm phong thành công ${successCount}/${totalFiles} file!`);
+      fetchImages();
+    }
+    
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -714,7 +737,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     <button onClick={() => fileInputRef.current?.click()} className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-bold rounded-xl shadow-lg hover:shadow-indigo-500/50 transition-all flex items-center gap-2">
                       + Chọn ảnh từ máy
                     </button>
-                    <input type="file" accept="image/*,video/*" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+                    <input type="file" accept="image/*,video/*" multiple ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
                     
                     <div className="flex items-center gap-3 mt-2">
                       <label className={`flex items-center gap-2 cursor-pointer text-xs font-semibold hover:opacity-80 transition-opacity ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
