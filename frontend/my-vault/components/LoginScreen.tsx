@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import CryptoJS from 'crypto-js';
 import { startAuthentication } from '@simplewebauthn/browser';
-import { supabase } from '@/lib/supabaseClient'; // Đảm bảo đường dẫn import Supabase đúng với dự án của bạn
+import { supabase } from '@/lib/supabaseClient'; 
 import OTPVerification from './OTPVerification';
 
 const WORD_LIST = ["apple", "bear", "cat", "dog", "eagle", "fire", "gold", "hero", "iron", "jump", "king", "lion", "moon", "nest", "ocean", "pine", "queen", "rose", "star", "tree", "unit", "vine", "wolf", "xray", "yarn", "zero", "sun", "sky", "sea", "wind", "rain"];
@@ -25,8 +25,11 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
   const [isStealth, setIsStealth] = useState(true);
   const [tapCount, setTapCount] = useState(0);
 
-  // STATE CHO OTP
+  // STATE CHO OTP VÀ ĐĂNG KÝ EMAIL MỚI
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false); 
+  const [newVaultEmail, setNewVaultEmail] = useState('');
+
   const [pendingKey, setPendingKey] = useState('');
   const [pendingWallet, setPendingWallet] = useState('');
   const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -127,7 +130,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
   };
 
   // =========================================================================
-  // LOGIC ĐĂNG NHẬP: KIỂM TRA THIẾT BỊ VÀ OTP
+  // LOGIC ĐĂNG NHẬP HOẶC TẠO KÉT MỚI BẮT BUỘC NHẬP EMAIL
   // =========================================================================
   const handleUnlockMaster = async (overrideKey?: string | React.MouseEvent) => {
     const isAutoLogin = typeof overrideKey === 'string';
@@ -148,28 +151,35 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
         localStorage.setItem('device_id', currentDeviceId);
       }
 
-      // Kiểm tra thiết bị trên Supabase
-      const { data: passkeyData, error } = await supabase
+      // Kiểm tra Két trên Supabase
+      const { data: passkeyData, error: checkError } = await supabase
         .from('passkeys')
         .select('active_device_id, recovery_email')
         .eq('wallet_address', walletAddress)
-        .single();
+        .maybeSingle();
 
-      // Nếu Két đã có thiết bị khác đăng nhập
-      if (passkeyData && passkeyData.active_device_id && passkeyData.active_device_id !== currentDeviceId) {
+      // TRƯỜNG HỢP 1: KÉT CHƯA TỒN TẠI (LẦN ĐẦU TẠO) -> BẬT POPUP ÉP NHẬP EMAIL
+      if (!passkeyData) {
+        setPendingKey(activeKey);
+        setPendingWallet(walletAddress);
+        setShowEmailModal(true); // Bật form bắt nhập Email
+        setStatus("Hãy điền Email bảo mật để hoàn tất khởi tạo.");
+        return;
+      }
+
+      // TRƯỜNG HỢP 2: KÉT ĐÃ TỒN TẠI NHƯNG KHÁC THIẾT BỊ ĐĂNG NHẬP -> XỬ LÝ OTP
+      if (passkeyData.active_device_id && passkeyData.active_device_id !== currentDeviceId) {
         if (!passkeyData.recovery_email) {
-          setStatus("❌ Két này chưa liên kết Email bảo mật. Không thể đăng nhập từ máy lạ!");
+          setStatus("❌ Két này chưa liên kết Email bảo mật. Không thể khôi phục thiết bị!");
           return;
         }
 
-        // 1. MỞ BẢNG NHẬP OTP NGAY LẬP TỨC (Không đợi gọi API)
         setPendingKey(activeKey);
         setPendingWallet(walletAddress);
         setRecoveryEmail(passkeyData.recovery_email);
         setShowOtpModal(true);
         setStatus("Đang gửi mã OTP đến email của bạn...");
 
-        // 2. GỌI API GỬI EMAIL TRONG KHỐI TRY/CATCH ĐỘC LẬP
         try {
           const otpRes = await fetch('https://sinh-trac-hoc-be.onrender.com/request-otp', {
             method: 'POST',
@@ -183,13 +193,13 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
             setStatus("✅ Vui lòng kiểm tra email của bạn.");
           }
         } catch (fetchError) {
-          setStatus("⚠️ Không gọi được server mail, hãy lấy OTP từ Supabase.");
+          setStatus("⚠️ Lỗi gọi gửi mail, lấy OTP từ Supabase.");
         }
         
-        return; // Dừng tiến trình đăng nhập thẳng, nhường quyền cho bảng OTP
+        return; 
       }
 
-      // NẾU LÀ MÁY QUEN (HOẶC CHƯA CÓ AI ĐĂNG NHẬP) -> VÀO THẲNG
+      // TRƯỜNG HỢP 3: KÉT ĐÃ TỒN TẠI VÀ ĐÚNG THIẾT BỊ -> VÀO THẲNG
       await executeFinalLogin(activeKey, walletAddress, currentDeviceId);
 
     } catch (error) {
@@ -197,16 +207,32 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
     }
   };
 
-  const executeFinalLogin = async (activeKey: string, walletAddress: string, deviceId: string) => {
-    // Kiểm tra xem Két đã có dòng dữ liệu trên bảng passkeys chưa
-    const { data: existing } = await supabase.from('passkeys').select('wallet_address').eq('wallet_address', walletAddress).maybeSingle();
-    
-    if (existing) {
-      await supabase.from('passkeys').update({ active_device_id: deviceId }).eq('wallet_address', walletAddress);
-    } else {
-      await supabase.from('passkeys').insert({ wallet_address: walletAddress, active_device_id: deviceId });
+  // Hàm được gọi sau khi nhập Email mới thành công
+  const submitNewVaultEmail = async () => {
+    if (!newVaultEmail || !newVaultEmail.includes('@')) {
+      alert("Vui lòng nhập một địa chỉ Email hợp lệ!");
+      return;
     }
-    
+
+    setStatus("⏳ Đang tạo Két sắt...");
+    const currentDeviceId = localStorage.getItem('device_id')!;
+
+    // Lưu Két mới cùng với Email vào Supabase
+    const { error } = await supabase.from('passkeys').insert({ 
+      wallet_address: pendingWallet, 
+      active_device_id: currentDeviceId,
+      recovery_email: newVaultEmail.trim()
+    });
+
+    if (error) {
+      setStatus("❌ Lỗi khi khởi tạo Két trên máy chủ.");
+    } else {
+      setShowEmailModal(false);
+      await executeFinalLogin(pendingKey, pendingWallet, currentDeviceId);
+    }
+  };
+
+  const executeFinalLogin = async (activeKey: string, walletAddress: string, deviceId: string) => {
     // Lưu session khóa E2EE
     sessionStorage.setItem('e2ee_master_key', walletAddress); 
     localStorage.setItem('wallet_address', walletAddress);
@@ -217,7 +243,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
       onUnlockSuccess(activeKey);
     } else {
       sessionStorage.removeItem('e2ee_master_key');
-      setStatus("❌ Từ khóa khôi phục không đúng!");
+      setStatus("❌ Lỗi kéo dữ liệu ảnh!");
     }
   };
 
@@ -244,9 +270,9 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
         if (resVerify.ok) {
           const savedKey = localStorage.getItem(`vault_key_${targetWalletAddress}`);
           if (savedKey) {
-             await handleUnlockMaster(savedKey); 
+              await handleUnlockMaster(savedKey); 
           } else {
-             setStatus("❌ Mất dữ liệu khóa, vui lòng nhập thủ công.");
+              setStatus("❌ Mất dữ liệu khóa, vui lòng nhập thủ công.");
           }
         } else {
           setStatus("❌ Khuôn mặt không khớp.");
@@ -513,7 +539,44 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
         </div>
       </div>
 
-      {/* ================= MODAL NHẬP OTP BẢO MẬT MỚI (6 SỐ CAO CẤP) ================= */}
+      {/* ================= MODAL NHẬP EMAIL KHI TẠO KÉT MỚI ================= */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-slate-800 font-bold mb-2 text-lg text-center">Tạo Két Mới</h3>
+            <p className="text-slate-500 text-sm text-center mb-6">
+              Bạn đang khởi tạo một Két sắt hoàn toàn mới. Vui lòng nhập địa chỉ Email khôi phục (Bắt buộc) để nhận mã OTP khi đổi thiết bị.
+            </p>
+            <input 
+              type="email"
+              value={newVaultEmail}
+              onChange={(e) => setNewVaultEmail(e.target.value)}
+              placeholder="Ví dụ: myemail@gmail.com"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-800 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 mb-6"
+              autoFocus
+            />
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setStatus("Đã hủy tạo Két mới.");
+                }} 
+                className="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-xl transition-all font-semibold"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={submitNewVaultEmail} 
+                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-all font-bold shadow-lg"
+              >
+                Chốt & Truy Cập
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL NHẬP OTP BẢO MẬT (CHUYỂN MÁY) ================= */}
       {showOtpModal && (
         <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <OTPVerification 
@@ -532,7 +595,6 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                 });
                 
                 if (verifyRes.ok) {
-                  // Đợi 1.5s để hiệu ứng "Thành công" màu xanh lá chạy xong
                   setTimeout(async () => {
                     setShowOtpModal(false);
                     setStatus("✅ Xác thực thành công!");
@@ -542,7 +604,7 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                 } else {
                   const err = await verifyRes.json();
                   setStatus(`❌ ${err.detail || "OTP không hợp lệ"}`);
-                  return false; // Sai mã sẽ tự kích hoạt hiệu ứng rung màu đỏ
+                  return false; 
                 }
               } catch (error) {
                 setStatus("❌ Lỗi kết nối máy chủ");

@@ -278,7 +278,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         const verifyRes = await fetch('https://sinh-trac-hoc-be.onrender.com/verify-otp', {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ email: existing.recovery_email, otp: otp.trim(), wallet_address: walletAddress })
+           body: JSON.stringify({ email: existing.recovery_email, otp_code: otp.trim(), wallet_address: walletAddress })
         });
 
         if (!verifyRes.ok) {
