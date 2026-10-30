@@ -236,6 +236,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
     showStatus("Đang kiểm tra dữ liệu Két...", 0);
     
     try {
+      // 1. Kiểm tra xem Két sắt này đã có Email bảo mật chưa
       const { data: existing, error: checkError } = await supabase
         .from('passkeys')
         .select('recovery_email')
@@ -244,34 +245,78 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
       if (checkError) throw checkError;
 
+      // 2. NẾU KẾT SẮT ĐÃ CÓ EMAIL TỪ TRƯỚC -> BẮT BUỘC XÁC THỰC OTP QUA EMAIL CŨ
       if (existing && existing.recovery_email) {
-        showStatus("⚠️ Két sắt này đã được liên kết Email từ trước. Không thể ghi đè!");
-        return;
+        const confirmUpdate = window.confirm(`⚠️ Két sắt này đang liên kết với Email: ${existing.recovery_email}\n\nBạn có muốn đổi sang Email khác không?`);
+        if (!confirmUpdate) {
+          showStatus("Đã hủy thao tác đổi email.", 2000);
+          return;
+        }
+
+        showStatus("Đang gửi mã OTP đến email cũ...", 0);
+        
+        // Gọi API gửi OTP tới email cũ (Tái sử dụng API request-otp)
+        try {
+           const sendRes = await fetch('https://sinh-trac-hoc-be.onrender.com/request-otp', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: existing.recovery_email, wallet_address: walletAddress }) 
+           });
+           if (!sendRes.ok) throw new Error("Gửi OTP thất bại");
+        } catch(e) {
+           showStatus("❌ Không thể kết nối tới máy chủ để gửi OTP!"); 
+           return;
+        }
+
+        // Bật hộp thoại nhập OTP
+        const otp = await askPrompt(`Nhập mã OTP 6 số vừa được gửi đến email ${existing.recovery_email}:`, false);
+        if (!otp) return;
+
+        showStatus("Đang xác thực OTP...", 0);
+        
+        // Gọi API xác thực OTP
+        const verifyRes = await fetch('https://sinh-trac-hoc-be.onrender.com/verify-otp', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ email: existing.recovery_email, otp: otp.trim(), wallet_address: walletAddress })
+        });
+
+        if (!verifyRes.ok) {
+           showStatus("❌ Mã OTP không chính xác hoặc đã hết hạn!");
+           return;
+        }
+      }
+
+      // 3. NẾU LÀ KÉT MỚI CHƯA CÓ EMAIL HOẶC ĐÃ XÁC THỰC OTP THÀNH CÔNG -> NHẬP EMAIL MỚI
+      const messagePrompt = existing?.recovery_email 
+        ? "Nhập địa chỉ Email MỚI muốn thay đổi:" 
+        : "Tạo liên kết: Nhập địa chỉ Email bảo mật của bạn (Dùng để nhận OTP khôi phục):";
+
+      const newEmail = await askPrompt(messagePrompt, false);
+      if (!newEmail) return;
+
+      showStatus("Đang lưu email...", 0);
+      const currentDeviceId = localStorage.getItem('device_id');
+
+      // Ghi đè hoặc thêm mới email vào bảng passkeys trên Supabase
+      const { error } = await supabase
+        .from('passkeys')
+        .upsert({ 
+          wallet_address: walletAddress, 
+          recovery_email: newEmail.trim(),
+          active_device_id: currentDeviceId
+        }, { 
+          onConflict: 'wallet_address'
+        });
+
+      if (error) {
+        showStatus(`❌ Lỗi hệ thống: ${error.message}`);
+      } else {
+        showStatus("✅ Đã cập nhật Email bảo mật thành công!");
       }
     } catch (err) {
       console.error("Lỗi kiểm tra két:", err);
-    }
-
-    const email = await askPrompt("Nhập địa chỉ Email bảo mật (Dùng để nhận OTP):", false);
-    if (!email) return;
-
-    showStatus("Đang lưu email...", 0);
-    const currentDeviceId = localStorage.getItem('device_id');
-
-    const { error } = await supabase
-      .from('passkeys')
-      .upsert({ 
-        wallet_address: walletAddress, 
-        recovery_email: email.trim(),
-        active_device_id: currentDeviceId
-      }, { 
-        onConflict: 'wallet_address'
-      });
-
-    if (error) {
-      showStatus(`❌ Lỗi: ${error.message}`);
-    } else {
-      showStatus("✅ Đã liên kết Email bảo mật thành công!");
+      showStatus("❌ Không thể kết nối tới cơ sở dữ liệu!");
     }
   };
 
