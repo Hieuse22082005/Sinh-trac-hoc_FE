@@ -20,17 +20,17 @@ Giao diện người dùng cho hệ thống két sắt lưu trữ ảnh/video b�
 1. Cài đặt các thư viện cần thiết:
    ```bash
    npm install
+   ```
 
-2. Tạo file .env.local ở thư mục gốc và thêm các biến môi trường:
+2. Tạo file `.env.local` ở thư mục gốc và thêm các biến môi trường:
+   ```ini
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_DELETE_PASSWORD=your_system_delete_password
+   ```
 
-Ini, TOML
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-NEXT_PUBLIC_DELETE_PASSWORD=your_system_delete_password
-
-3.Chạy môi trường phát triển:
-
-Bash
-npm run dev
-
-Ứng dụng sẽ chạy tại: http://localhost:3000
+3. Chạy môi trường phát triển:
+   ```bash
+   npm run dev
+   ```
+   *Ứng dụng sẽ chạy tại: [http://localhost:3000](http://localhost:3000)*
