@@ -102,6 +102,20 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
     }
   };
 
+  const handleQuickCopy = async () => {
+    const textToCopy = seedWords.join(' ').trim();
+    if (!textToCopy) {
+      setStatus("⚠️ Chưa có từ khóa nào để sao chép!");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setStatus("✅ Đã sao chép 5 từ khóa vào khay nhớ tạm!");
+    } catch (err) {
+      setStatus("❌ Trình duyệt chặn quyền sao chép. Hãy bôi đen thủ công.");
+    }
+  };
+
   const handlePasteMaster = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedText = e.clipboardData.getData('text');
@@ -475,6 +489,10 @@ export default function LoginScreen({ onUnlockSuccess }: { onUnlockSuccess: (key
                 </div>
                 
                 <div className="flex items-center gap-3">
+                  <button onClick={handleQuickCopy} className="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-800 transition-colors bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-md font-medium">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Copy nhanh
+                  </button>
                   <button onClick={handleQuickPaste} className="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-800 transition-colors bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-md font-medium">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
                     Dán nhanh
