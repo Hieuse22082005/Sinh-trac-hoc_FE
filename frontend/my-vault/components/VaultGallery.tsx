@@ -664,6 +664,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
       <div className="relative z-10 flex w-full h-full">
         {/* THANH MENU (SIDEBAR) */}
+        {/* ĐÃ SỬA z-index và luồng hiển thị để không bị mờ */}
         <aside 
           className={`fixed inset-y-0 left-0 z-[100] w-64 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static shrink-0 border-r flex flex-col pt-8 overflow-y-auto custom-scrollbar backdrop-blur-2xl transition-transform duration-300 ${sidebarBg}`}
           onClick={() => setIsMobileMenuOpen(false)}
@@ -713,7 +714,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
             <div className="flex items-center gap-3 w-full md:w-96">
               <button 
                 onClick={() => setIsMobileMenuOpen(true)} 
-                className={`md:hidden flex items-center justify-center p-2.5 rounded-xl border transition-all active:scale-95 shrink-0 ${isDark ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-white border-slate-200 text-slate-600 shadow-sm'}`}
+                className={`md:hidden flex items-center justify-center p-2.5 rounded-xl border transition-all active:scale-95 shrink-0 z-50 ${isDark ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-white border-slate-200 text-slate-600 shadow-sm'}`}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
               </button>
@@ -816,9 +817,8 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 const displayName = aliases[item.filename] || item.filename.replace('.enc', '');
                 const isSelected = selectedFiles.includes(item.filename);
                 
-                // Xử lý trạng thái chạm trên điện thoại (để hiện menu tính năng)
+                // Trạng thái chạm trên điện thoại (hiện menu)
                 const isTapped = tappedCard === item.filename; 
-                // Trên PC vẫn dùng group-hover, trên Mobile dùng isTapped
                 const showOverlay = isSelected || isTapped; 
 
                 return (
@@ -830,7 +830,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                      if (selectedFiles.length > 0) {
                        toggleSelectFile(item.filename);
                      } else {
-                       // Nếu không chọn nhiều file, bấm vào ảnh là phóng to (UX chuẩn của gallery)
+                       // Bấm trực tiếp vào ảnh là phóng to (chuẩn gallery)
                        if (item.src) setViewingImage(item.src);
                      }
                   }}
@@ -845,9 +845,9 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
-                  {/* Nút bật menu tính năng (Luôn hiện trên mobile, góc phải trên) */}
+                  {/* Nút bật menu tính năng (3 chấm) - Đã sửa lỗi đè chéo */}
                   <button 
-                    className="absolute top-3 right-3 z-30 w-8 h-8 flex items-center justify-center bg-black/50 backdrop-blur-md rounded-full border border-white/20 text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                    className="absolute top-3 right-3 z-30 w-8 h-8 flex items-center justify-center bg-black/50 backdrop-blur-md rounded-full border border-white/20 text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity active:scale-90"
                     onClick={(e) => {
                       e.stopPropagation(); // Ngăn không cho phóng to ảnh
                       setTappedCard(isTapped ? null : item.filename); // Bật/tắt menu
@@ -871,7 +871,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
-                  {/* Lớp phủ đen và các nút: Hiện khi bấm nút 3 chấm (showOverlay) hoặc hover trên máy tính */}
+                  {/* Lớp phủ đen và các menu tính năng (SẮP XẾP LẠI KHÔNG BỊ ĐÈ) */}
                   <div 
                     className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/80 transition-opacity duration-300 flex flex-col justify-between p-4 z-20 ${showOverlay ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto'}`}
                     onClick={(e) => {
@@ -882,19 +882,20 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                         }
                     }}
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start mt-8">
+                      {/* Nút check chọn nhiều ảnh */}
                       {(!item.is_private || item.src) ? (
                         <input 
                           type="checkbox" checked={isSelected}
                           onChange={(e) => { e.stopPropagation(); toggleSelectFile(item.filename); }}
-                          className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95 mt-1"
+                          className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95"
                         />
                       ) : (
                         <div className="w-5 h-5"></div>
                       )}
                       
-                      {/* Cụm nút tính năng: Xếp dọc bên phải cho dễ bấm */}
-                      <div className="flex flex-col gap-2">
+                      {/* Cụm nút tính năng: Đã xếp thành lưới gọn gàng (Grid) để không bị đè chéo */}
+                      <div className="grid grid-cols-2 gap-2 mt-2 mr-1">
                         {(!item.is_private || item.src) && (
                           <>
                             {activeTab !== 'all' && activeTab !== 'favorites' && activeTab !== 'trash' ? (
