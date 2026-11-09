@@ -654,61 +654,62 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       <div className={`absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none transition-colors duration-1000 z-0 ${isDark ? 'bg-indigo-900/20' : 'bg-blue-300/30'}`}></div>
       <div className={`absolute bottom-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full blur-[140px] pointer-events-none transition-colors duration-1000 z-0 ${isDark ? 'bg-blue-900/15' : 'bg-indigo-300/20'}`}></div>
 
-      {/* LỚP NỀN MỜ KHI MỞ MENU TRÊN ĐIỆN THOẠI */}
+      {/* LỚP NỀN MỜ KHI MỞ MENU TRÊN ĐIỆN THOẠI - ĐÃ ĐƯA RA NGOÀI VÀ NÂNG Z-INDEX */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] md:hidden transition-opacity" 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9990] md:hidden transition-opacity" 
           onClick={() => setIsMobileMenuOpen(false)} 
         />
       )}
 
-      <div className="relative z-10 flex w-full h-full">
-        {/* THANH MENU (SIDEBAR) */}
-        {/* ĐÃ SỬA z-index và luồng hiển thị để không bị mờ */}
-        <aside 
-          className={`fixed inset-y-0 left-0 z-[100] w-64 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static shrink-0 border-r flex flex-col pt-8 overflow-y-auto custom-scrollbar backdrop-blur-2xl transition-transform duration-300 ${sidebarBg}`}
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <div className="px-8 mb-10 flex items-center gap-3 cursor-pointer group active:scale-95 transition-transform" onClick={(e) => { e.stopPropagation(); setActiveTab('all'); setIsMobileMenuOpen(false); }}>
-            <div className="flex items-center justify-center w-10 h-10 shrink-0 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-full shadow-[0_0_15px_rgba(79,70,229,0.5)] group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,70,229,0.7)] transition-all duration-300">
-              <ShieldCheck className="w-5 h-5 text-white" strokeWidth={2.5} />
-            </div>
-            <h1 className={`text-2xl font-extrabold tracking-tight truncate transition-colors ${textHeading}`}>
-              {vaultName}
-            </h1>
+      {/* Tách riêng cấu trúc Sidebar khỏi thẻ flex cha */}
+      {/* THANH MENU (SIDEBAR) - Đã sửa lỗi bị nền đè */}
+      <aside 
+        className={`fixed inset-y-0 left-0 z-[9999] w-64 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 shrink-0 border-r flex flex-col pt-8 overflow-y-auto custom-scrollbar backdrop-blur-2xl transition-transform duration-300 ${sidebarBg}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-8 mb-10 flex items-center gap-3 cursor-pointer group active:scale-95 transition-transform" onClick={() => { setActiveTab('all'); setIsMobileMenuOpen(false); }}>
+          <div className="flex items-center justify-center w-10 h-10 shrink-0 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-full shadow-[0_0_15px_rgba(79,70,229,0.5)] group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,70,229,0.7)] transition-all duration-300">
+            <ShieldCheck className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
+          <h1 className={`text-2xl font-extrabold tracking-tight truncate transition-colors ${textHeading}`}>
+            {vaultName}
+          </h1>
+        </div>
 
-          <div className="flex-1 px-4 space-y-1">
-            <p className={`text-[11px] font-bold uppercase tracking-widest mb-4 ml-4 ${isDark ? 'text-slate-500' : 'text-indigo-400'}`}>Góc riêng của bạn</p>
-            <button onClick={(e) => { e.stopPropagation(); setActiveTab('all'); setIsMobileMenuOpen(false); }} className={getMenuClass(activeTab === 'all')}>
-              <span className="text-lg group-hover:scale-110 transition-transform">🖼️</span> Tổng hợp ảnh
-              <span className="ml-auto text-xs font-mono opacity-60">{images.length - trashList.length}</span>
+        <div className="flex-1 px-4 space-y-1">
+          <p className={`text-[11px] font-bold uppercase tracking-widest mb-4 ml-4 ${isDark ? 'text-slate-500' : 'text-indigo-400'}`}>Góc riêng của bạn</p>
+          <button onClick={() => { setActiveTab('all'); setIsMobileMenuOpen(false); }} className={getMenuClass(activeTab === 'all')}>
+            <span className="text-lg group-hover:scale-110 transition-transform">🖼️</span> Tổng hợp ảnh
+            <span className="ml-auto text-xs font-mono opacity-60">{images.length - trashList.length}</span>
+          </button>
+          <div className="flex items-center mt-2 group/create">
+            <button onClick={() => { handleCreateCollection(); setIsMobileMenuOpen(false); }} className={`flex-1 flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 active:scale-95 hover:translate-x-1.5 ${isDark ? 'hover:bg-white/5 text-slate-400 hover:text-slate-200' : 'hover:bg-indigo-50 text-slate-600 hover:text-indigo-900'}`}>
+              <span className="text-lg group-hover/create:scale-110 transition-transform">📁</span> Tạo bộ sưu tập
             </button>
-            <div className="flex items-center mt-2 group/create">
-              <button onClick={(e) => { e.stopPropagation(); handleCreateCollection(); setIsMobileMenuOpen(false); }} className={`flex-1 flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 active:scale-95 hover:translate-x-1.5 ${isDark ? 'hover:bg-white/5 text-slate-400 hover:text-slate-200' : 'hover:bg-indigo-50 text-slate-600 hover:text-indigo-900'}`}>
-                <span className="text-lg group-hover/create:scale-110 transition-transform">📁</span> Tạo bộ sưu tập
+          </div>
+          {Object.keys(collections).map(col => (
+            <div key={col} className={`flex items-center group/col rounded-xl transition-all duration-300 overflow-hidden ${activeTab === col ? (isDark ? 'bg-indigo-500/10 shadow-[inset_3px_0_0_0_#6366f1]' : 'bg-indigo-100 shadow-[inset_3px_0_0_0_#4f46e5]') : (isDark ? 'hover:bg-white/5' : 'hover:bg-slate-100')}`}>
+              <button onClick={() => { setActiveTab(col); setIsMobileMenuOpen(false); }} className={`flex-1 flex items-center gap-3 pl-10 pr-2 py-3 text-sm font-medium truncate transition-all duration-300 active:scale-[0.98] group-hover/col:translate-x-1 ${activeTab === col ? (isDark ? 'text-indigo-300' : 'text-indigo-700 font-bold') : (isDark ? 'text-slate-400 group-hover/col:text-slate-200' : 'text-slate-600 group-hover/col:text-slate-900')}`}>
+                <span className="truncate">{col}</span>
               </button>
+              <span className="text-xs font-mono opacity-50 px-2">{collections[col].length}</span>
+              <button onClick={(e) => { e.stopPropagation(); handleDeleteCollection(col); }} className="opacity-0 group-hover/col:opacity-100 px-3 py-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 active:scale-90 transition-all mr-1 rounded-lg" title="Xóa BST này">✖</button>
             </div>
-            {Object.keys(collections).map(col => (
-              <div key={col} className={`flex items-center group/col rounded-xl transition-all duration-300 overflow-hidden ${activeTab === col ? (isDark ? 'bg-indigo-500/10 shadow-[inset_3px_0_0_0_#6366f1]' : 'bg-indigo-100 shadow-[inset_3px_0_0_0_#4f46e5]') : (isDark ? 'hover:bg-white/5' : 'hover:bg-slate-100')}`}>
-                <button onClick={(e) => { e.stopPropagation(); setActiveTab(col); setIsMobileMenuOpen(false); }} className={`flex-1 flex items-center gap-3 pl-10 pr-2 py-3 text-sm font-medium truncate transition-all duration-300 active:scale-[0.98] group-hover/col:translate-x-1 ${activeTab === col ? (isDark ? 'text-indigo-300' : 'text-indigo-700 font-bold') : (isDark ? 'text-slate-400 group-hover/col:text-slate-200' : 'text-slate-600 group-hover/col:text-slate-900')}`}>
-                  <span className="truncate">{col}</span>
-                </button>
-                <span className="text-xs font-mono opacity-50 px-2">{collections[col].length}</span>
-                <button onClick={(e) => { e.stopPropagation(); handleDeleteCollection(col); }} className="opacity-0 group-hover/col:opacity-100 px-3 py-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 active:scale-90 transition-all mr-1 rounded-lg" title="Xóa BST này">✖</button>
-              </div>
-            ))}
-            <button onClick={(e) => { e.stopPropagation(); setActiveTab('favorites'); setIsMobileMenuOpen(false); }} className={`mt-2 ${getMenuClass(activeTab === 'favorites', 'fav')}`}>
-              <span className="text-lg group-hover:scale-110 transition-transform">🤍</span> Yêu thích
-              <span className="ml-auto text-xs font-mono opacity-60">{favorites.length}</span>
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); setActiveTab('trash'); setIsMobileMenuOpen(false); }} className={getMenuClass(activeTab === 'trash', 'trash')}>
-              <span className="text-lg group-hover:scale-110 transition-transform">🗑️</span> Thùng rác
-            </button>
-          </div>
-        </aside>
+          ))}
+          <button onClick={() => { setActiveTab('favorites'); setIsMobileMenuOpen(false); }} className={`mt-2 ${getMenuClass(activeTab === 'favorites', 'fav')}`}>
+            <span className="text-lg group-hover:scale-110 transition-transform">🤍</span> Yêu thích
+            <span className="ml-auto text-xs font-mono opacity-60">{favorites.length}</span>
+          </button>
+          <button onClick={() => { setActiveTab('trash'); setIsMobileMenuOpen(false); }} className={getMenuClass(activeTab === 'trash', 'trash')}>
+            <span className="text-lg group-hover:scale-110 transition-transform">🗑️</span> Thùng rác
+          </button>
+        </div>
+      </aside>
 
-        <main className="flex-1 flex flex-col relative h-screen">
+      {/* Nội dung chính */}
+      <div className="relative z-10 flex w-full h-full flex-col md:flex-row">
+        <main className="flex-1 flex flex-col relative h-screen w-full">
           <header className={`h-auto md:h-16 flex flex-col md:flex-row items-center justify-between px-4 md:px-8 py-3 md:py-0 shrink-0 border-b backdrop-blur-xl transition-colors duration-500 gap-3 md:gap-0 ${headerBg}`}>
             {/* THANH TÌM KIẾM & NÚT MENU (MOBILE) */}
             <div className="flex items-center gap-3 w-full md:w-96">
@@ -817,7 +818,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 const displayName = aliases[item.filename] || item.filename.replace('.enc', '');
                 const isSelected = selectedFiles.includes(item.filename);
                 
-                // Trạng thái chạm trên điện thoại (hiện menu)
+                // Trạng thái chạm (hiện menu)
                 const isTapped = tappedCard === item.filename; 
                 const showOverlay = isSelected || isTapped; 
 
@@ -826,11 +827,9 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                   key={index} 
                   className={`group relative aspect-[4/3] rounded-[1.2rem] overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-2xl ${cardBg} ${isSelected ? 'ring-4 ring-indigo-500 scale-[0.98]' : 'lg:hover:-translate-y-1'}`}
                   onClick={() => {
-                     // Nếu đang chọn nhiều file thì tích luôn, không phóng to
                      if (selectedFiles.length > 0) {
                        toggleSelectFile(item.filename);
                      } else {
-                       // Bấm trực tiếp vào ảnh là phóng to (chuẩn gallery)
                        if (item.src) setViewingImage(item.src);
                      }
                   }}
@@ -845,12 +844,12 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
-                  {/* Nút bật menu tính năng (3 chấm) - Đã sửa lỗi đè chéo */}
+                  {/* Nút bật menu tính năng (3 chấm) */}
                   <button 
                     className="absolute top-3 right-3 z-30 w-8 h-8 flex items-center justify-center bg-black/50 backdrop-blur-md rounded-full border border-white/20 text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity active:scale-90"
                     onClick={(e) => {
-                      e.stopPropagation(); // Ngăn không cho phóng to ảnh
-                      setTappedCard(isTapped ? null : item.filename); // Bật/tắt menu
+                      e.stopPropagation(); 
+                      setTappedCard(isTapped ? null : item.filename); 
                     }}
                   >
                     ⋮
@@ -871,11 +870,10 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
-                  {/* Lớp phủ đen và các menu tính năng (SẮP XẾP LẠI KHÔNG BỊ ĐÈ) */}
+                  {/* Lớp phủ đen và các menu tính năng (SẮP XẾP LẠI BẰNG GRID ĐỂ KHÔNG BỊ ĐÈ CHÉO) */}
                   <div 
                     className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/80 transition-opacity duration-300 flex flex-col justify-between p-4 z-20 ${showOverlay ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto'}`}
                     onClick={(e) => {
-                        // Bấm vào vùng trống của menu thì đóng menu
                         if (isTapped) {
                            e.stopPropagation();
                            setTappedCard(null);
@@ -894,7 +892,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                         <div className="w-5 h-5"></div>
                       )}
                       
-                      {/* Cụm nút tính năng: Đã xếp thành lưới gọn gàng (Grid) để không bị đè chéo */}
+                      {/* Cụm nút tính năng: Xếp bằng Grid 2 cột */}
                       <div className="grid grid-cols-2 gap-2 mt-2 mr-1">
                         {(!item.is_private || item.src) && (
                           <>
