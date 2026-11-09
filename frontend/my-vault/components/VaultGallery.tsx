@@ -693,59 +693,58 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
         </aside>
 
         <main className="flex-1 flex flex-col relative h-screen">
-          <header className={`h-16 flex items-center justify-between px-8 shrink-0 border-b backdrop-blur-xl transition-colors duration-500 ${headerBg}`}>
-            <div className={`flex items-center gap-3 rounded-xl px-4 py-2 w-96 transition-all duration-300 ${inputWrapper}`}>
+          <header className={`h-auto md:h-16 flex flex-col md:flex-row items-center justify-between px-4 md:px-8 py-3 md:py-0 shrink-0 border-b backdrop-blur-xl transition-colors duration-500 gap-3 md:gap-0 ${headerBg}`}>
+            <div className={`flex items-center gap-3 rounded-xl px-4 py-2 w-full md:w-96 transition-all duration-300 ${inputWrapper}`}>
               <span className="text-slate-400 text-sm">🔍</span>
               <input type="text" placeholder="Tìm kỷ niệm (Theo tên gốc hoặc tên đã sửa)..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`bg-transparent border-none outline-none w-full text-sm focus:ring-0 ${inputText}`} />
             </div>
 
-            <div className="flex items-center gap-4 md:gap-6">
-              {status && <span className="text-xs text-emerald-500 font-bold animate-pulse bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">{status}</span>}
+            <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 w-full md:w-auto">
+              {status && <span className="text-[10px] md:text-xs text-emerald-500 font-bold animate-pulse bg-emerald-500/10 px-2 md:px-3 py-1.5 rounded-lg border border-emerald-500/20">{status}</span>}
               
-              <button onClick={toggleTheme} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-90 shadow-md border ${isDark ? 'bg-white/5 border-white/10 text-yellow-300 hover:bg-white/10' : 'bg-white border-slate-200 text-indigo-500 hover:bg-slate-50'}`} title="Đổi giao diện">
+              <button onClick={toggleTheme} className={`w-8 h-8 md:w-9 md:h-9 shrink-0 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-90 shadow-md border ${isDark ? 'bg-white/5 border-white/10 text-yellow-300 hover:bg-white/10' : 'bg-white border-slate-200 text-indigo-500 hover:bg-slate-50'}`} title="Đổi giao diện">
                 {isDark ? '🌞' : '🌙'}
               </button>
               
-              <button onClick={handleRegisterEmail} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>✉️ Email OTP</button>
-
-              <button onClick={handleRegisterFaceID} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>📸 FaceID</button>
-              <button onClick={onLock} className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20' : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'}`}>[→ Khóa Két</button>
+              <button onClick={handleRegisterEmail} className={`text-[11px] md:text-xs font-semibold px-3 md:px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>✉️ Email OTP</button>
+              <button onClick={handleRegisterFaceID} className={`text-[11px] md:text-xs font-semibold px-3 md:px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>📸 FaceID</button>
+              <button onClick={onLock} className={`text-[11px] md:text-xs font-semibold px-3 md:px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20' : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'}`}>[→ Khóa Két</button>
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-8 pb-12 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-12 custom-scrollbar overflow-x-hidden">
             {activeTab === 'all' && !searchQuery && (
-              <div className="mb-12 mt-8 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="mb-8 md:mb-12 mt-6 md:mt-8 animate-in slide-in-from-bottom-4 duration-500 max-w-full">
                 <div className="flex items-end justify-between mb-4">
-                  <div>
-                    <h2 className={`text-3xl font-extrabold flex items-center gap-3 ${textHeading}`}>
+                  <div className="w-full">
+                    <h2 className={`text-2xl md:text-3xl font-extrabold flex flex-wrap items-center gap-3 ${textHeading}`}>
                       Vùng an toàn 
                       <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest border ${isDark ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-indigo-100 text-indigo-600 border-indigo-200'}`}>Riêng tư</span>
                     </h2>
-                    <p className={`text-sm mt-2 ${textSub}`}>Chào bạn, những điều đẹp nhất đôi khi chỉ cần mình bạn biết. ✨</p>
+                    <p className={`text-xs md:text-sm mt-2 ${textSub}`}>Chào bạn, những điều đẹp nhất đôi khi chỉ cần mình bạn biết. ✨</p>
                   </div>
                 </div>
 
-                <div className={`mt-6 w-full h-[300px] border-[2px] border-dashed rounded-3xl flex flex-col items-center justify-center text-center relative group transition-all duration-300 backdrop-blur-md ${uploadBox}`}>
-                  <div className="w-16 h-16 mb-4 relative drop-shadow-xl">
-                    <span className="text-5xl absolute inset-0 flex items-center justify-center group-hover:scale-125 group-hover:-translate-y-3 transition-all duration-500">☁️</span>
+                <div className={`mt-4 md:mt-6 w-full py-8 md:h-[300px] md:py-0 border-[2px] border-dashed rounded-2xl md:rounded-3xl flex flex-col items-center justify-center text-center relative group transition-all duration-300 backdrop-blur-md ${uploadBox}`}>
+                  <div className="w-12 h-12 md:w-16 md:h-16 mb-2 md:mb-4 relative drop-shadow-xl">
+                    <span className="text-4xl md:text-5xl absolute inset-0 flex items-center justify-center group-hover:scale-125 group-hover:-translate-y-3 transition-all duration-500">☁️</span>
                   </div>
-                  <h3 className={`text-xl font-bold mb-2 ${textHeading}`}>Thả ảnh bí mật vào đây 🤫</h3>
-                  <p className={`text-xs mb-6 ${textSub}`}>Kéo thả những khoảnh khắc của bạn, phần còn lại để {vaultName} lo.</p>
+                  <h3 className={`text-lg md:text-xl font-bold mb-1 md:mb-2 ${textHeading}`}>Thả ảnh bí mật vào đây 🤫</h3>
+                  <p className={`text-[10px] md:text-xs mb-4 md:mb-6 px-4 ${textSub}`}>Kéo thả những khoảnh khắc của bạn, phần còn lại để {vaultName} lo.</p>
                   
-                  <div className="flex flex-col items-center gap-4">
-                    <button onClick={() => fileInputRef.current?.click()} className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-bold rounded-xl shadow-lg hover:shadow-indigo-500/50 transition-all flex items-center gap-2">
+                  <div className="flex flex-col items-center gap-3 w-full px-4">
+                    <button onClick={() => fileInputRef.current?.click()} className="px-6 md:px-8 py-2.5 md:py-3 w-full max-w-[200px] bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs md:text-sm font-bold rounded-xl shadow-lg hover:shadow-indigo-500/50 transition-all flex items-center justify-center gap-2">
                       + Chọn ảnh từ máy
                     </button>
                     <input type="file" accept="image/*,video/*" multiple ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
                     
-                    <div className="flex items-center gap-3 mt-2">
-                      <label className={`flex items-center gap-2 cursor-pointer text-xs font-semibold hover:opacity-80 transition-opacity ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                        <input type="checkbox" checked={isUploadPrivate} onChange={(e) => setIsUploadPrivate(e.target.checked)} className="rounded border-slate-400 text-rose-500 focus:ring-0 transition-all w-4 h-4"/>
+                    <div className="flex flex-col items-center gap-2 mt-2 w-full">
+                      <label className={`flex items-center gap-2 cursor-pointer text-[10px] md:text-xs font-semibold hover:opacity-80 transition-opacity ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <input type="checkbox" checked={isUploadPrivate} onChange={(e) => setIsUploadPrivate(e.target.checked)} className="rounded border-slate-400 text-rose-500 focus:ring-0 transition-all w-3.5 h-3.5 md:w-4 md:h-4"/>
                         Bảo vệ cấp 2 (Tuyệt Mật)
                       </label>
                       {isUploadPrivate && (
-                        <input type="password" placeholder="Mật khẩu khóa ảnh..." value={uploadLevel2Key} onChange={(e) => setUploadLevel2Key(e.target.value)} className={`w-40 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-rose-400 transition-all ${isDark ? 'bg-black/60 border border-slate-600 text-white' : 'bg-white border border-slate-300 text-slate-800 shadow-inner'}`}/>
+                        <input type="password" placeholder="Mật khẩu khóa ảnh..." value={uploadLevel2Key} onChange={(e) => setUploadLevel2Key(e.target.value)} className={`w-full max-w-[200px] rounded-lg px-3 py-2 text-[10px] md:text-xs outline-none focus:ring-2 focus:ring-rose-400 transition-all ${isDark ? 'bg-black/60 border border-slate-600 text-white' : 'bg-white border border-slate-300 text-slate-800 shadow-inner'}`}/>
                       )}
                     </div>
                   </div>
