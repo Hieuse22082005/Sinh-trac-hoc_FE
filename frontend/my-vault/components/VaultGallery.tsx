@@ -13,7 +13,6 @@ interface TrashItem { filename: string; deletedAt: number; }
 interface ExtendedSecureImage extends SecureImage { originalThumb?: string | null; }
 
 export default function VaultGallery({ masterKeyString, onLock }: { masterKeyString: string, onLock: () => void }) {
-  // [ĐÃ SỬA LỖI] Đưa state vào đúng bên trong component
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [tappedCard, setTappedCard] = useState<string | null>(null);
 
@@ -666,7 +665,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
       <div className="relative z-10 flex w-full h-full">
         {/* THANH MENU (SIDEBAR) */}
         <aside 
-          className={`fixed inset-y-0 left-0 z-[100] w-64 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 shrink-0 border-r flex flex-col pt-8 overflow-y-auto custom-scrollbar backdrop-blur-2xl transition-transform duration-300 ${sidebarBg}`}
+          className={`fixed inset-y-0 left-0 z-[100] w-64 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static shrink-0 border-r flex flex-col pt-8 overflow-y-auto custom-scrollbar backdrop-blur-2xl transition-transform duration-300 ${sidebarBg}`}
           onClick={() => setIsMobileMenuOpen(false)}
         >
           <div className="px-8 mb-10 flex items-center gap-3 cursor-pointer group active:scale-95 transition-transform" onClick={(e) => { e.stopPropagation(); setActiveTab('all'); setIsMobileMenuOpen(false); }}>
@@ -721,7 +720,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
               <div className={`flex-1 flex items-center gap-3 rounded-xl px-4 py-2 transition-all duration-300 ${inputWrapper}`}>
                 <span className="text-slate-400 text-sm">🔍</span>
-                <input type="text" placeholder="Tìm kỷ niệm..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`bg-transparent border-none outline-none w-full text-sm focus:ring-0 ${inputText}`} />
+                <input type="text" placeholder="Tìm kỷ niệm (Theo tên gốc hoặc tên đã sửa)..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`bg-transparent border-none outline-none w-full text-sm focus:ring-0 ${inputText}`} />
               </div>
             </div>
 
@@ -817,25 +816,28 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 const displayName = aliases[item.filename] || item.filename.replace('.enc', '');
                 const isSelected = selectedFiles.includes(item.filename);
                 
-                // [THÊM MỚI] Xử lý trạng thái chạm trên điện thoại
+                // Xử lý trạng thái chạm trên điện thoại (để hiện menu tính năng)
                 const isTapped = tappedCard === item.filename; 
+                // Trên PC vẫn dùng group-hover, trên Mobile dùng isTapped
                 const showOverlay = isSelected || isTapped; 
 
                 return (
                 <div 
                   key={index} 
-                  onClick={() => {
-                    // Trên mobile: Nếu đang chọn nhiều file thì tích luôn, nếu không thì bật/tắt menu
-                    if (selectedFiles.length > 0) {
-                      toggleSelectFile(item.filename);
-                    } else {
-                      setTappedCard(isTapped ? null : item.filename);
-                    }
-                  }}
                   className={`group relative aspect-[4/3] rounded-[1.2rem] overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-2xl ${cardBg} ${isSelected ? 'ring-4 ring-indigo-500 scale-[0.98]' : 'lg:hover:-translate-y-1'}`}
+                  onClick={() => {
+                     // Nếu đang chọn nhiều file thì tích luôn, không phóng to
+                     if (selectedFiles.length > 0) {
+                       toggleSelectFile(item.filename);
+                     } else {
+                       // Nếu không chọn nhiều file, bấm vào ảnh là phóng to (UX chuẩn của gallery)
+                       if (item.src) setViewingImage(item.src);
+                     }
+                  }}
                 >
                   
-                  <div className="absolute top-3 left-12 z-20 pointer-events-none opacity-90 lg:group-hover:opacity-100 transition-opacity">
+                  {/* Nhãn ẢNH/VIDEO */}
+                  <div className="absolute top-3 left-3 z-20 pointer-events-none opacity-90 transition-opacity">
                     {isVideoFile(item) ? (
                       <span className="px-2.5 py-1 bg-black/70 backdrop-blur-md rounded-md border border-white/20 text-white text-[10px] font-extrabold flex items-center gap-1.5 shadow-lg">▶️ VIDEO</span>
                     ) : (
@@ -843,6 +845,18 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
+                  {/* Nút bật menu tính năng (Luôn hiện trên mobile, góc phải trên) */}
+                  <button 
+                    className="absolute top-3 right-3 z-30 w-8 h-8 flex items-center justify-center bg-black/50 backdrop-blur-md rounded-full border border-white/20 text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Ngăn không cho phóng to ảnh
+                      setTappedCard(isTapped ? null : item.filename); // Bật/tắt menu
+                    }}
+                  >
+                    ⋮
+                  </button>
+
+                  {/* Nội dung ảnh/video */}
                   <div className="w-full h-full absolute inset-0">
                     {item.thumb ? (
                       <img src={item.thumb} alt="thumb" className="w-full h-full object-cover blur-xl scale-125 lg:group-hover:scale-150 transition-transform duration-700" />
@@ -857,20 +871,30 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
-                  {/* Lớp phủ đen và các nút: Hiện khi chạm trên điện thoại (showOverlay) hoặc hover trên máy tính (lg:group-hover) */}
-                  <div className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-black/40 transition-opacity duration-300 flex flex-col justify-between p-4 z-10 pointer-events-auto ${showOverlay ? 'opacity-100' : 'opacity-0 lg:group-hover:opacity-100'}`}>
-                    <div className="flex justify-between">
+                  {/* Lớp phủ đen và các nút: Hiện khi bấm nút 3 chấm (showOverlay) hoặc hover trên máy tính */}
+                  <div 
+                    className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/80 transition-opacity duration-300 flex flex-col justify-between p-4 z-20 ${showOverlay ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto'}`}
+                    onClick={(e) => {
+                        // Bấm vào vùng trống của menu thì đóng menu
+                        if (isTapped) {
+                           e.stopPropagation();
+                           setTappedCard(null);
+                        }
+                    }}
+                  >
+                    <div className="flex justify-between items-start">
                       {(!item.is_private || item.src) ? (
                         <input 
                           type="checkbox" checked={isSelected}
                           onChange={(e) => { e.stopPropagation(); toggleSelectFile(item.filename); }}
-                          className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95"
+                          className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95 mt-1"
                         />
                       ) : (
                         <div className="w-5 h-5"></div>
                       )}
                       
-                      <div className="flex gap-2">
+                      {/* Cụm nút tính năng: Xếp dọc bên phải cho dễ bấm */}
+                      <div className="flex flex-col gap-2">
                         {(!item.is_private || item.src) && (
                           <>
                             {activeTab !== 'all' && activeTab !== 'favorites' && activeTab !== 'trash' ? (
@@ -922,19 +946,6 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                         )}
                       </div>
                     </div>
-
-                    {item.src && (
-                      <button 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          setViewingImage(item.src!); 
-                          setTappedCard(null); // Tắt menu khi đã phóng to
-                        }} 
-                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-6 py-2.5 bg-white/20 hover:bg-[#8B5CF6] active:scale-90 backdrop-blur-md rounded-xl text-white text-sm font-bold transition-all shadow-2xl border border-white/30 ${showOverlay ? 'opacity-100 scale-110' : 'opacity-0 scale-75 lg:group-hover:opacity-100 lg:group-hover:scale-110'}`}
-                      >
-                        Phóng To
-                      </button>
-                    )}
 
                     <div className={`mt-auto transform transition-transform duration-300 ${showOverlay ? 'translate-y-0' : 'translate-y-3 lg:group-hover:translate-y-0'}`}>
                       <div className="flex items-center justify-between gap-2 mb-1.5">
