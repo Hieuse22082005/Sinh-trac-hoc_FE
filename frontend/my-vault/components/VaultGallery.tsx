@@ -726,16 +726,51 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 w-full md:w-auto">
+            <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4 w-full md:w-auto">
               {status && <span className="text-[10px] md:text-xs text-emerald-500 font-bold animate-pulse bg-emerald-500/10 px-2 md:px-3 py-1.5 rounded-lg border border-emerald-500/20">{status}</span>}
               
-              <button onClick={toggleTheme} className={`w-8 h-8 md:w-9 md:h-9 shrink-0 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-90 shadow-md border ${isDark ? 'bg-white/5 border-white/10 text-yellow-300 hover:bg-white/10' : 'bg-white border-slate-200 text-indigo-500 hover:bg-slate-50'}`} title="Đổi giao diện">
+              <button onClick={toggleTheme} className={`w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-90 shadow-md border ${isDark ? 'bg-white/5 border-white/10 text-yellow-300 hover:bg-white/10' : 'bg-white border-slate-200 text-indigo-500 hover:bg-slate-50'}`} title="Đổi giao diện">
                 {isDark ? '🌞' : '🌙'}
               </button>
               
-              <button onClick={handleRegisterEmail} className={`text-[11px] md:text-xs font-semibold px-3 md:px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>✉️ Email OTP</button>
-              <button onClick={handleRegisterFaceID} className={`text-[11px] md:text-xs font-semibold px-3 md:px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>📸 FaceID</button>
-              <button onClick={onLock} className={`text-[11px] md:text-xs font-semibold px-3 md:px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm ${isDark ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20' : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'}`}>[→ Khóa Két</button>
+              {/* NÚT EMAIL OTP (UI Pro Max) */}
+              <button 
+                onClick={handleRegisterEmail}
+                className="group flex items-center bg-[#212121] hover:bg-black text-white px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all active:scale-95 shadow-md"
+              >
+                <div className="flex items-center justify-center w-5 h-5 md:w-6 md:h-6 transform transition-transform duration-500 linear group-hover:scale-125">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#9b9999] group-hover:fill-white transition-all duration-300 group-hover:translate-x-4 group-hover:scale-110 transform-origin-center">
+                    <path d="M22 6C22 4.9 21.1 4 20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6ZM20 6L12 11L4 6H20ZM20 18H4V8L12 13L20 8V18Z"></path>
+                  </svg>
+                </div>
+                <span className="block ml-2 transition-all duration-500 linear group-hover:opacity-0 group-hover:w-0 overflow-hidden whitespace-nowrap">Email OTP</span>
+              </button>
+
+              {/* NÚT FACEID (UI Pro Max) */}
+              <button 
+                onClick={handleRegisterFaceID}
+                className="group flex items-center bg-[#212121] hover:bg-black text-white px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all active:scale-95 shadow-md"
+              >
+                <div className="flex items-center justify-center w-5 h-5 md:w-6 md:h-6 transform transition-transform duration-500 linear group-hover:scale-125">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#9b9999] group-hover:fill-white transition-all duration-300 group-hover:translate-x-[1.2rem] group-hover:scale-110 transform-origin-center">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM8.5 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm7 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
+                  </svg>
+                </div>
+                <span className="block ml-2 transition-all duration-500 linear group-hover:opacity-0 group-hover:w-0 overflow-hidden whitespace-nowrap">FaceID</span>
+              </button>
+
+              {/* NÚT KHÓA KÉT (UI Pro Max) */}
+              <button 
+                onClick={onLock}
+                className="group flex items-center bg-[#2b101c] hover:bg-[#400010] text-rose-300 px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all active:scale-95 shadow-md"
+              >
+                <div className="flex items-center justify-center w-5 h-5 md:w-6 md:h-6 transform transition-transform duration-500 linear group-hover:scale-125">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#fca5a5] group-hover:fill-rose-500 transition-all duration-300 group-hover:translate-x-[1.4rem] group-hover:scale-110 transform-origin-center">
+                    <path d="M22,15.04C22,17.23 20.24,19 18.07,19H5.93C3.76,19 2,17.23 2,15.04C2,13.07 3.43,11.44 5.31,11.14C5.28,11 5.27,10.86 5.27,10.71C5.27,9.33 6.38,8.2 7.76,8.2C8.37,8.2 8.94,8.43 9.37,8.8C10.14,7.05 11.13,5.44 13.91,5.44C17.28,5.44 18.87,8.06 18.87,10.83C18.87,10.94 18.87,11.06 18.86,11.17C20.65,11.54 22,13.13 22,15.04Z"></path>
+                  </svg>
+                </div>
+                <span className="block ml-2 transition-all duration-500 linear group-hover:opacity-0 group-hover:w-0 overflow-hidden whitespace-nowrap text-rose-400">Khóa Két</span>
+              </button>
             </div>
           </header>
 
