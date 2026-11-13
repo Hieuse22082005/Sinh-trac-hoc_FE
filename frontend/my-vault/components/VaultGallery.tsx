@@ -733,43 +733,37 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 {isDark ? '🌞' : '🌙'}
               </button>
               
-              {/* NÚT EMAIL OTP (UI Pro Max) */}
+              {/* NÚT EMAIL OTP */}
               <button 
                 onClick={handleRegisterEmail}
-                className="group flex items-center bg-[#212121] hover:bg-black text-white px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all active:scale-95 shadow-md"
+                className="group flex items-center justify-center gap-2 group-hover:gap-0 bg-[#212121] hover:bg-black text-white px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all duration-500 active:scale-95 shadow-md"
               >
-                <div className="flex items-center justify-center w-5 h-5 md:w-6 md:h-6 transform transition-transform duration-500 linear group-hover:scale-125">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#9b9999] group-hover:fill-white transition-all duration-300 group-hover:translate-x-4 group-hover:scale-110 transform-origin-center">
-                    <path d="M22 6C22 4.9 21.1 4 20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6ZM20 6L12 11L4 6H20ZM20 18H4V8L12 13L20 8V18Z"></path>
-                  </svg>
-                </div>
-                <span className="block ml-2 transition-all duration-500 linear group-hover:opacity-0 group-hover:w-0 overflow-hidden whitespace-nowrap">Email OTP</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#9b9999] group-hover:fill-white transition-all duration-500 group-hover:scale-125 shrink-0">
+                  <path d="M22 6C22 4.9 21.1 4 20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6ZM20 6L12 11L4 6H20ZM20 18H4V8L12 13L20 8V18Z"></path>
+                </svg>
+                <span className="block overflow-hidden whitespace-nowrap max-w-[100px] group-hover:max-w-0 opacity-100 group-hover:opacity-0 transition-all duration-500 linear">Email OTP</span>
               </button>
 
-              {/* NÚT FACEID (UI Pro Max) */}
+              {/* NÚT FACEID */}
               <button 
                 onClick={handleRegisterFaceID}
-                className="group flex items-center bg-[#212121] hover:bg-black text-white px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all active:scale-95 shadow-md"
+                className="group flex items-center justify-center gap-2 group-hover:gap-0 bg-[#212121] hover:bg-black text-white px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all duration-500 active:scale-95 shadow-md"
               >
-                <div className="flex items-center justify-center w-5 h-5 md:w-6 md:h-6 transform transition-transform duration-500 linear group-hover:scale-125">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#9b9999] group-hover:fill-white transition-all duration-300 group-hover:translate-x-[1.2rem] group-hover:scale-110 transform-origin-center">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM8.5 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm7 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
-                  </svg>
-                </div>
-                <span className="block ml-2 transition-all duration-500 linear group-hover:opacity-0 group-hover:w-0 overflow-hidden whitespace-nowrap">FaceID</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#9b9999] group-hover:fill-white transition-all duration-500 group-hover:scale-125 shrink-0">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM8.5 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm7 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
+                </svg>
+                <span className="block overflow-hidden whitespace-nowrap max-w-[100px] group-hover:max-w-0 opacity-100 group-hover:opacity-0 transition-all duration-500 linear">FaceID</span>
               </button>
 
-              {/* NÚT KHÓA KÉT (UI Pro Max) */}
+              {/* NÚT KHÓA KÉT */}
               <button 
                 onClick={onLock}
-                className="group flex items-center bg-[#2b101c] hover:bg-[#400010] text-rose-300 px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all active:scale-95 shadow-md"
+                className="group flex items-center justify-center gap-2 group-hover:gap-0 bg-[#2b101c] hover:bg-[#400010] text-rose-300 px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-extrabold cursor-pointer border-none transition-all duration-500 active:scale-95 shadow-md"
               >
-                <div className="flex items-center justify-center w-5 h-5 md:w-6 md:h-6 transform transition-transform duration-500 linear group-hover:scale-125">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#fca5a5] group-hover:fill-rose-500 transition-all duration-300 group-hover:translate-x-[1.4rem] group-hover:scale-110 transform-origin-center">
-                    <path d="M22,15.04C22,17.23 20.24,19 18.07,19H5.93C3.76,19 2,17.23 2,15.04C2,13.07 3.43,11.44 5.31,11.14C5.28,11 5.27,10.86 5.27,10.71C5.27,9.33 6.38,8.2 7.76,8.2C8.37,8.2 8.94,8.43 9.37,8.8C10.14,7.05 11.13,5.44 13.91,5.44C17.28,5.44 18.87,8.06 18.87,10.83C18.87,10.94 18.87,11.06 18.86,11.17C20.65,11.54 22,13.13 22,15.04Z"></path>
-                  </svg>
-                </div>
-                <span className="block ml-2 transition-all duration-500 linear group-hover:opacity-0 group-hover:w-0 overflow-hidden whitespace-nowrap text-rose-400">Khóa Két</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" className="fill-[#fca5a5] group-hover:fill-rose-500 transition-all duration-500 group-hover:scale-125 shrink-0">
+                  <path d="M22,15.04C22,17.23 20.24,19 18.07,19H5.93C3.76,19 2,17.23 2,15.04C2,13.07 3.43,11.44 5.31,11.14C5.28,11 5.27,10.86 5.27,10.71C5.27,9.33 6.38,8.2 7.76,8.2C8.37,8.2 8.94,8.43 9.37,8.8C10.14,7.05 11.13,5.44 13.91,5.44C17.28,5.44 18.87,8.06 18.87,10.83C18.87,10.94 18.87,11.06 18.86,11.17C20.65,11.54 22,13.13 22,15.04Z"></path>
+                </svg>
+                <span className="block overflow-hidden whitespace-nowrap max-w-[100px] group-hover:max-w-0 opacity-100 group-hover:opacity-0 transition-all duration-500 linear text-rose-400">Khóa Két</span>
               </button>
             </div>
           </header>
