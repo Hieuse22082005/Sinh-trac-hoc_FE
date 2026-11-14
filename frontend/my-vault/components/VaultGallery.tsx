@@ -999,31 +999,90 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                       )}
                       
                       {/* Cụm nút tính năng: Xếp bằng Grid 2 cột */}
-                      <div className="grid grid-cols-2 gap-2 mt-2 mr-1">
+                      {/* FIX 3: Cụm nút tính năng (UI Pro Max - Squircle Gradient) */}
+                      <div className="grid grid-cols-2 gap-3 mt-2 mr-1 relative z-30">
+                        {/* Thẻ định nghĩa shape Squircle ẩn (Bắt buộc phải có 1 lần) */}
+                        <svg width="0" height="0" className="absolute">
+                          <defs>
+                            <clipPath id="squircleClip" clipPathUnits="objectBoundingBox">
+                              <path d="M 0,0.5 C 0,0 0,0 0.5,0 S 1,0 1,0.5 1,1 0.5,1 0,1 0,0.5"></path>
+                            </clipPath>
+                          </defs>
+                        </svg>
+
                         {isSelectable && (
                           <>
                             {activeTab !== 'all' && activeTab !== 'favorites' && activeTab !== 'trash' ? (
-                              <button onClick={(e) => { e.stopPropagation(); handleRemoveFromCollection(activeTab, item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Rút khỏi Bộ sưu tập này">➖</button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleRemoveFromCollection(activeTab, item.filename); }} 
+                                style={{ clipPath: 'url(#squircleClip)' }}
+                                className="w-9 h-9 bg-gradient-to-br from-rose-500 to-rose-800 flex items-center justify-center shadow-lg border border-rose-400/50 cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl" 
+                                title="Rút khỏi Bộ sưu tập này"
+                              >
+                                <span className="text-white text-xs drop-shadow-md font-bold">➖</span>
+                              </button>
                             ) : activeTab === 'all' ? (
-                              <button onClick={(e) => { e.stopPropagation(); setShowColMenuFor(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-indigo-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Thêm vào Bộ sưu tập">📁</button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setShowColMenuFor(item.filename); }} 
+                                style={{ clipPath: 'url(#squircleClip)' }}
+                                className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-indigo-800 flex items-center justify-center shadow-lg border border-indigo-400/50 cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl" 
+                                title="Thêm vào Bộ sưu tập"
+                              >
+                                <span className="text-white text-xs drop-shadow-md">📁</span>
+                              </button>
                             ) : null}
 
                             {item.is_private && item.src && activeTab !== 'trash' && (
-                               <button onClick={(e) => { e.stopPropagation(); if(window.confirm("Bỏ lớp bảo vệ và chuyển file này thành CÔNG KHAI?")) handleChangePrivacy(item, false); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-blue-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Bỏ mã hóa, chuyển thành Công Khai">🌍</button>
+                               <button 
+                                 onClick={(e) => { e.stopPropagation(); if(window.confirm("Bỏ lớp bảo vệ và chuyển file này thành CÔNG KHAI?")) handleChangePrivacy(item, false); }} 
+                                 style={{ clipPath: 'url(#squircleClip)' }}
+                                 className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-800 flex items-center justify-center shadow-lg border border-blue-400/50 cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl" 
+                                 title="Bỏ mã hóa, chuyển thành Công Khai"
+                               >
+                                 <span className="text-white text-xs drop-shadow-md">🌍</span>
+                               </button>
                             )}
 
                             {activeTab !== 'trash' && (
-                              <button onClick={(e) => { e.stopPropagation(); toggleFavorite(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-xs transition-all shadow-xl hover:scale-110 active:scale-90">
-                                {favorites.includes(item.filename) ? '❤️' : '🤍'}
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); toggleFavorite(item.filename); }} 
+                                style={{ clipPath: 'url(#squircleClip)' }}
+                                className={`w-9 h-9 bg-gradient-to-br flex items-center justify-center shadow-lg border cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl ${favorites.includes(item.filename) ? 'from-rose-500 to-rose-700 border-rose-400/50' : 'from-gray-700 to-gray-900 border-gray-500/50'}`}
+                                title={favorites.includes(item.filename) ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+                              >
+                                <span className={`text-xs drop-shadow-md transition-transform duration-300 ${favorites.includes(item.filename) ? 'scale-110' : ''}`}>
+                                  {favorites.includes(item.filename) ? '❤️' : '🤍'}
+                                </span>
                               </button>
                             )}
                             
                             {activeTab !== 'trash' ? (
-                              <button onClick={(e) => { e.stopPropagation(); handleSoftDelete(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Chuyển vào thùng rác">🗑️</button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleSoftDelete(item.filename); }} 
+                                style={{ clipPath: 'url(#squircleClip)' }}
+                                className="w-9 h-9 bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shadow-lg border border-red-500/50 cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl" 
+                                title="Chuyển vào thùng rác"
+                              >
+                                <span className="text-white text-xs drop-shadow-md">🗑️</span>
+                              </button>
                             ) : (
                               <>
-                                <button onClick={(e) => { e.stopPropagation(); handleRestore(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-emerald-500 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Khôi phục">♻️</button>
-                                <button onClick={(e) => { e.stopPropagation(); handleHardDelete(item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-600 text-white text-xs transition-all shadow-xl hover:scale-110 active:scale-90" title="Xóa vĩnh viễn">☠️</button>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleRestore(item.filename); }} 
+                                  style={{ clipPath: 'url(#squircleClip)' }}
+                                  className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-emerald-800 flex items-center justify-center shadow-lg border border-emerald-400/50 cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl" 
+                                  title="Khôi phục"
+                                >
+                                  <span className="text-white text-xs drop-shadow-md">♻️</span>
+                                </button>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleHardDelete(item.filename); }} 
+                                  style={{ clipPath: 'url(#squircleClip)' }}
+                                  className="w-9 h-9 bg-gradient-to-br from-red-700 to-red-950 flex items-center justify-center shadow-lg border border-red-600/50 cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl" 
+                                  title="Xóa vĩnh viễn"
+                                >
+                                  <span className="text-white text-xs drop-shadow-md font-bold">☠️</span>
+                                </button>
                               </>
                             )}
                           </>
@@ -1043,10 +1102,13 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                                  if (pwd) handleChangePrivacy(item, true, pwd);
                               }
                             }} 
-                            className={`w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-md border border-white/10 transition-all text-xs shadow-xl hover:scale-110 active:scale-90 ${item.is_private ? (item.src ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-rose-500 hover:bg-rose-600 text-white') : 'bg-black/70 hover:bg-slate-600 text-white'}`}
+                            style={{ clipPath: 'url(#squircleClip)' }}
+                            className={`w-9 h-9 bg-gradient-to-br flex items-center justify-center shadow-lg border cursor-pointer transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1 hover:shadow-2xl ${item.is_private ? (item.src ? 'from-emerald-500 to-emerald-700 border-emerald-400/50' : 'from-rose-500 to-rose-800 border-rose-400/50') : 'from-gray-700 to-gray-900 border-gray-600/50'}`}
                             title={item.is_private ? (item.src ? "Đang mở. Bấm để khóa lại ngay" : "Bấm để nhập mật khẩu xem ảnh") : "Bấm để khóa tuyệt mật cấp 2"}
                           >
-                            {item.is_private ? (item.src ? '🔓' : '🔒') : '🔓'}
+                            <span className="text-white text-xs drop-shadow-md">
+                              {item.is_private ? (item.src ? '🔓' : '🔒') : '🔓'}
+                            </span>
                           </button>
                         )}
                       </div>
