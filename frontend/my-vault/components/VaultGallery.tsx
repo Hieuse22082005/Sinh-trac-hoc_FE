@@ -857,14 +857,22 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 const isTapped = tappedCard === item.filename; 
                 const showOverlay = isSelected || isTapped; 
 
+                // FIX 1: Điều kiện để được phép Chọn (Select)
+                // Chỉ được phép chọn nếu: Ảnh là công khai (is_private = false) HOẶC Ảnh tuyệt mật nhưng đã được mở khóa (có src)
+                const isSelectable = !item.is_private || !!item.src;
+
                 return (
                 <div 
                   key={index} 
                   className={`group relative aspect-[4/3] rounded-[1.2rem] overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-2xl ${cardBg} ${isSelected ? 'ring-4 ring-indigo-500 scale-[0.98]' : 'lg:hover:-translate-y-1'}`}
                   onClick={() => {
                      if (selectedFiles.length > 0) {
-                       toggleSelectFile(item.filename);
+                       // Nếu đang trong chế độ Chọn nhiều -> Chỉ cho phép chọn nếu isSelectable = true
+                       if (isSelectable) {
+                          toggleSelectFile(item.filename);
+                       }
                      } else {
+                       // Bấm trực tiếp vào ảnh -> Phóng to (nếu ảnh đã mở khóa)
                        if (item.src) setViewingImage(item.src);
                      }
                   }}
@@ -905,7 +913,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     )}
                   </div>
 
-                  {/* Lớp phủ đen và các menu tính năng (SẮP XẾP LẠI BẰNG GRID ĐỂ KHÔNG BỊ ĐÈ CHÉO) */}
+                  {/* Lớp phủ đen và các menu tính năng */}
                   <div 
                     className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/80 transition-opacity duration-300 flex flex-col justify-between p-4 z-20 ${showOverlay ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto'}`}
                     onClick={(e) => {
@@ -916,20 +924,31 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                     }}
                   >
                     <div className="flex justify-between items-start mt-8">
-                      {/* Nút check chọn nhiều ảnh */}
-                      {(!item.is_private || item.src) ? (
-                        <input 
-                          type="checkbox" checked={isSelected}
-                          onChange={(e) => { e.stopPropagation(); toggleSelectFile(item.filename); }}
-                          className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95"
-                        />
+                      
+                      {/* FIX 2: Ô Checkbox chọn ảnh - Ngăn chặn Event Bubbling gây phóng to ảnh */}
+                      {isSelectable ? (
+                        <div 
+                           className="w-8 h-8 flex items-start justify-start cursor-pointer z-30"
+                           onClick={(e) => {
+                              // CỰC KỲ QUAN TRỌNG: Ngăn chặn click lan truyền ra thẻ Div bọc bên ngoài
+                              e.stopPropagation(); 
+                              toggleSelectFile(item.filename); 
+                           }}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            readOnly // Để Div bọc ngoài xử lý sự kiện onClick
+                            className="w-5 h-5 rounded border-2 border-white/80 text-indigo-500 focus:ring-0 bg-black/50 cursor-pointer shadow-lg checked:border-indigo-500 transition-all hover:scale-110 active:scale-95 pointer-events-none"
+                          />
+                        </div>
                       ) : (
-                        <div className="w-5 h-5"></div>
+                        <div className="w-8 h-8"></div>
                       )}
                       
                       {/* Cụm nút tính năng: Xếp bằng Grid 2 cột */}
                       <div className="grid grid-cols-2 gap-2 mt-2 mr-1">
-                        {(!item.is_private || item.src) && (
+                        {isSelectable && (
                           <>
                             {activeTab !== 'all' && activeTab !== 'favorites' && activeTab !== 'trash' ? (
                               <button onClick={(e) => { e.stopPropagation(); handleRemoveFromCollection(activeTab, item.filename); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md border border-white/10 hover:bg-rose-500 text-white text-xs transition-all hover:scale-110 active:scale-90 shadow-xl" title="Rút khỏi Bộ sưu tập này">➖</button>
