@@ -685,8 +685,8 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
             
             {/* Header Menu */}
             <div className="flex items-baseline gap-3 mb-2">
-              <span className={`text-xl font-black underline underline-offset-4 ${isDark ? 'text-white' : 'text-[#1a1a1a]'}`}>01</span>
-              <span className={`text-[11px] uppercase tracking-[0.2em] font-extrabold ${isDark ? 'text-white' : 'text-[#1a1a1a]'}`}>Menu Két Sắt</span>
+              <span className={`text-xl font-black underline underline-offset-4 ${isDark ? 'text-white' : 'text-[#1a1a1a]'}`}>Menu Két Sắt</span>
+              
             </div>
 
             {/* Đã xóa các vạch trang trí trừu tượng gây rối mắt ở đây */}
