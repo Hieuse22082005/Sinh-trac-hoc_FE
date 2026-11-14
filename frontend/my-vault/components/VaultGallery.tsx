@@ -29,7 +29,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
   const [trashList, setTrashList] = useState<TrashItem[]>([]); 
   const [collections, setCollections] = useState<Record<string, string[]>>({}); 
   const [aliases, setAliases] = useState<Record<string, string>>({});
-  const [vaultName, setVaultName] = useState<string>('hush.');
+  const [vaultName, setVaultName] = useState<string>('TEAM 5');
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [showColMenuFor, setShowColMenuFor] = useState<string | null>(null);
 
