@@ -1052,14 +1052,19 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
       {promptData.isOpen && (
         <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in zoom-in-95 duration-200">
-          <div className="bg-[#13161E] border border-slate-700/50 rounded-2xl p-6 w-full max-w-md shadow-[0_0_50px_rgba(0,0,0,0.8)]">
-            <h3 className="text-white font-bold mb-4 text-lg">{promptData.message}</h3>
-            <div className="relative mb-6">
+          <div className="bg-[#fff] border-4 border-black rounded-none p-8 w-full max-w-md shadow-[10px_10px_0_#4a90e2] transition-all relative overflow-hidden">
+            
+            {/* Brutalist Form Container */}
+            <div className="relative font-mono mt-8 mb-8">
               <input
                 type={promptData.isPassword && !showPasswordToggle ? "password" : "text"}
                 value={promptInput}
                 onChange={(e) => setPromptInput(e.target.value)}
-                className="w-full bg-black/50 border border-slate-600 rounded-xl px-4 py-3.5 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all shadow-inner"
+                placeholder="TYPE HERE"
+                className="w-full p-4 text-[18px] font-bold text-black bg-white border-4 border-black outline-none rounded-none shadow-[5px_5px_0_#000] focus:border-[#4a90e2] focus:shadow-[5px_5px_0_#4a90e2] transition-all duration-300 placeholder:text-gray-500 focus:placeholder:text-transparent relative z-10"
+                style={{
+                  animation: promptInput ? 'none' : 'focus-pulse 4s cubic-bezier(0.25, 0.8, 0.25, 1) infinite'
+                }}
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -1068,23 +1073,73 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                   }
                 }}
               />
+              
+              {/* Brutalist Label */}
+              <label className="absolute -left-[3px] -top-[35px] text-[14px] font-bold text-white bg-black px-[10px] py-[5px] -rotate-1 z-20 transition-all duration-300 peer-focus:rotate-0 peer-focus:scale-105 peer-focus:bg-[#4a90e2] uppercase">
+                {promptData.message}
+              </label>
+
+              {/* Lớp phủ giả Glitch (được CSS nội bộ lo liệu bên dưới) */}
+              <style dangerouslySetInnerHTML={{__html: `
+                @keyframes focus-pulse {
+                  0%, 100% { border-color: #000; box-shadow: 5px 5px 0 #000; }
+                  50% { border-color: #4a90e2; box-shadow: 5px 5px 0 #4a90e2; }
+                }
+                
+                input:focus {
+                  animation: focus-pulse 4s cubic-bezier(0.25, 0.8, 0.25, 1) infinite, glitch 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+                }
+                
+                @keyframes glitch {
+                  0% { transform: translate(0); }
+                  20% { transform: translate(-2px, 2px); }
+                  40% { transform: translate(-2px, -2px); }
+                  60% { transform: translate(2px, 2px); }
+                  80% { transform: translate(2px, -2px); }
+                  100% { transform: translate(0); }
+                }
+                
+                input:focus::before {
+                  content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                  background: black; z-index: -2; clip-path: inset(0 100% 0 0);
+                  animation: glitch-slice 4s steps(2, end) infinite;
+                }
+                
+                @keyframes glitch-slice {
+                  0% { clip-path: inset(0 100% 0 0); }
+                  10% { clip-path: inset(0 5% 0 0); }
+                  20% { clip-path: inset(0 80% 0 0); }
+                  30% { clip-path: inset(0 10% 0 0); }
+                  40% { clip-path: inset(0 50% 0 0); }
+                  50% { clip-path: inset(0 30% 0 0); }
+                  60% { clip-path: inset(0 70% 0 0); }
+                  70% { clip-path: inset(0 15% 0 0); }
+                  80% { clip-path: inset(0 90% 0 0); }
+                  90% { clip-path: inset(0 5% 0 0); }
+                  100% { clip-path: inset(0 100% 0 0); }
+                }
+              `}} />
+
+              {/* Nút Toggle Mật Khẩu (nếu có) */}
               {promptData.isPassword && (
                 <button
                   onClick={() => setShowPasswordToggle(!showPasswordToggle)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xl"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black hover:text-[#4a90e2] text-xl z-20 transition-colors"
                   title={showPasswordToggle ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                 >
                   {showPasswordToggle ? '👁️' : '🙈'}
                 </button>
               )}
             </div>
-            <div className="flex justify-end gap-3">
+
+            {/* Brutalist Action Buttons */}
+            <div className="flex justify-end gap-4 mt-6">
               <button
                 onClick={() => {
                   promptData.resolve?.(null);
                   setPromptData(p => ({ ...p, isOpen: false }));
                 }}
-                className="px-5 py-2.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all font-semibold active:scale-95"
+                className="font-mono px-6 py-3 bg-white text-black border-4 border-black font-bold uppercase transition-transform hover:-translate-y-1 hover:shadow-[4px_4px_0_#000] active:translate-y-1 active:shadow-none"
               >
                 Hủy
               </button>
@@ -1093,7 +1148,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                   promptData.resolve?.(promptInput);
                   setPromptData(p => ({ ...p, isOpen: false }));
                 }}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all font-bold shadow-lg shadow-indigo-500/30 active:scale-95"
+                className="font-mono px-6 py-3 bg-[#4a90e2] text-white border-4 border-black font-bold uppercase transition-transform hover:-translate-y-1 hover:shadow-[4px_4px_0_#000] active:translate-y-1 active:shadow-none"
               >
                 Xác nhận
               </button>
