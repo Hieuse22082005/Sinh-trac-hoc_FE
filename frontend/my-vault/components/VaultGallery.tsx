@@ -664,6 +664,7 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
 
       {/* Tách riêng cấu trúc Sidebar khỏi thẻ flex cha */}
       {/* THANH MENU (SIDEBAR) - Đã sửa lỗi bị nền đè */}
+      {/* THANH MENU (SIDEBAR) - PHONG CÁCH BRUTALIST + ICON TRỰC QUAN */}
       <aside 
         className={`fixed inset-y-0 left-0 z-[9999] w-64 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 shrink-0 border-r flex flex-col pt-8 overflow-y-auto custom-scrollbar backdrop-blur-2xl transition-transform duration-300 ${sidebarBg}`}
         onClick={(e) => e.stopPropagation()}
@@ -678,55 +679,51 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
           </h1>
         </div>
 
-        {/* CONTAINER MENU BAUHAUS */}
+        {/* CONTAINER MENU */}
         <div className="flex-1 px-4 pb-10 relative mt-2">
           <div className={`relative flex flex-col gap-5 border-l-8 ${isDark ? 'border-white' : 'border-[#1a1a1a]'} pl-5 ml-3`}>
             
-            {/* Bauhaus Header */}
+            {/* Header Menu */}
             <div className="flex items-baseline gap-3 mb-2">
               <span className={`text-xl font-black underline underline-offset-4 ${isDark ? 'text-white' : 'text-[#1a1a1a]'}`}>01</span>
               <span className={`text-[11px] uppercase tracking-[0.2em] font-extrabold ${isDark ? 'text-white' : 'text-[#1a1a1a]'}`}>Menu Két Sắt</span>
             </div>
 
-            {/* Đồ họa trang trí Bauhaus (Đường chéo) */}
-            <div className="absolute -top-6 -right-2 w-10 h-10 pointer-events-none hidden md:block">
-              <div className="absolute w-[3px] h-[80px] bg-[#fcbf49] top-0 right-[10px]"></div>
-              <div className="absolute w-[50px] h-[10px] bg-[#4a90e2] bottom-[-40px] right-[-10px] z-0"></div>
-            </div>
+            {/* Đã xóa các vạch trang trí trừu tượng gây rối mắt ở đây */}
 
             <div className="flex flex-col gap-4 relative z-10">
-              {/* ITEM 1: TỔNG HỢP ẢNH (HÌNH TRÒN ĐỎ) */}
+              {/* ITEM 1: TỔNG HỢP ẢNH */}
               <button 
                 onClick={(e) => { e.stopPropagation(); setActiveTab('all'); setIsMobileMenuOpen(false); }} 
                 className="group flex items-center w-full cursor-pointer relative transition-transform duration-200 hover:translate-x-2"
               >
-                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${isDark ? 'border-white' : 'border-[#1a1a1a]'} ${activeTab === 'all' ? (isDark ? 'bg-white' : 'bg-[#1a1a1a]') : 'bg-transparent'}`}>
-                  <div className={`transition-all duration-400 rounded-full bg-[#e63946] ${activeTab === 'all' ? 'opacity-100 w-[18px] h-[18px]' : 'opacity-0 w-0 h-0'}`}></div>
+                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${activeTab === 'all' ? 'border-[#e63946] bg-[#e63946]' : (isDark ? 'border-white bg-transparent' : 'border-[#1a1a1a] bg-transparent')}`}>
+                  <span className={`text-sm transition-transform duration-300 ${activeTab === 'all' ? 'scale-110' : 'grayscale opacity-60 group-hover:opacity-100 group-hover:grayscale-0'}`}>🖼️</span>
                 </div>
                 <span className={`text-[13px] md:text-[14px] font-black uppercase tracking-tight transition-colors duration-300 flex-1 text-left ${activeTab === 'all' ? 'text-[#e63946]' : (isDark ? 'text-white' : 'text-[#1a1a1a]')}`}>Tổng hợp ảnh</span>
                 <span className={`text-xs font-mono opacity-60 font-bold ${activeTab === 'all' ? 'text-[#e63946]' : (isDark ? 'text-white' : 'text-[#1a1a1a]')}`}>{images.length - trashList.length}</span>
               </button>
 
-              {/* ITEM 2: TẠO BỘ SƯU TẬP (HÌNH VUÔNG RỖNG) */}
+              {/* ITEM 2: TẠO BỘ SƯU TẬP */}
               <button 
                 onClick={(e) => { e.stopPropagation(); handleCreateCollection(); setIsMobileMenuOpen(false); }} 
                 className="group flex items-center w-full cursor-pointer relative transition-transform duration-200 hover:translate-x-2"
               >
-                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${isDark ? 'border-white' : 'border-[#1a1a1a]'} bg-transparent`}>
-                  <div className="w-3 h-3 bg-transparent border-[2px] border-[#4a90e2] opacity-50 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 group-hover:border-[#4a90e2] group-hover:bg-[#4a90e2] ${isDark ? 'border-white bg-transparent' : 'border-[#1a1a1a] bg-transparent'}`}>
+                  <span className="text-sm transition-transform duration-300 grayscale opacity-60 group-hover:opacity-100 group-hover:grayscale-0 group-hover:scale-110">➕</span>
                 </div>
-                <span className={`text-[13px] md:text-[14px] font-black uppercase tracking-tight transition-colors duration-300 flex-1 text-left ${isDark ? 'text-slate-400 group-hover:text-white' : 'text-slate-500 group-hover:text-black'}`}>Tạo bộ sưu tập</span>
+                <span className={`text-[13px] md:text-[14px] font-black uppercase tracking-tight transition-colors duration-300 flex-1 text-left ${isDark ? 'text-slate-400 group-hover:text-[#4a90e2]' : 'text-slate-500 group-hover:text-[#4a90e2]'}`}>Tạo bộ sưu tập</span>
               </button>
 
-              {/* ITEM 3: VÒNG LẶP CÁC BỘ SƯU TẬP (HÌNH VUÔNG XANH LƯỚT SÓNG) */}
+              {/* ITEM 3: VÒNG LẶP CÁC BỘ SƯU TẬP */}
               {Object.keys(collections).map(col => (
                 <div key={col} className="group/col relative flex items-center w-full transition-transform duration-200 hover:translate-x-2">
                     <button 
                       onClick={(e) => { e.stopPropagation(); setActiveTab(col); setIsMobileMenuOpen(false); }} 
                       className="flex items-center flex-1 cursor-pointer"
                     >
-                      <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${isDark ? 'border-white' : 'border-[#1a1a1a]'} ${activeTab === col ? (isDark ? 'bg-white' : 'bg-[#1a1a1a]') : 'bg-transparent'}`}>
-                        <div className={`transition-all duration-400 bg-[#4a90e2] ${activeTab === col ? 'opacity-100 w-[16px] h-[16px]' : 'opacity-0 w-0 h-0'}`}></div>
+                      <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${activeTab === col ? 'border-[#4a90e2] bg-[#4a90e2]' : (isDark ? 'border-white bg-transparent' : 'border-[#1a1a1a] bg-transparent')}`}>
+                        <span className={`text-sm transition-transform duration-300 ${activeTab === col ? 'scale-110' : 'grayscale opacity-60 group-hover:opacity-100 group-hover:grayscale-0'}`}>📁</span>
                       </div>
                       <span className={`text-[13px] md:text-[14px] font-black uppercase tracking-tight transition-colors duration-300 flex-1 text-left truncate pr-2 ${activeTab === col ? 'text-[#4a90e2]' : (isDark ? 'text-white' : 'text-[#1a1a1a]')}`}>{col}</span>
                     </button>
@@ -735,26 +732,25 @@ export default function VaultGallery({ masterKeyString, onLock }: { masterKeyStr
                 </div>
               ))}
 
-              {/* ITEM 4: YÊU THÍCH (HÌNH TAM GIÁC VÀNG) */}
+              {/* ITEM 4: YÊU THÍCH */}
               <button 
                 onClick={(e) => { e.stopPropagation(); setActiveTab('favorites'); setIsMobileMenuOpen(false); }} 
                 className="group flex items-center w-full cursor-pointer relative transition-transform duration-200 hover:translate-x-2 mt-4"
               >
-                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${isDark ? 'border-white' : 'border-[#1a1a1a]'} ${activeTab === 'favorites' ? (isDark ? 'bg-white' : 'bg-[#1a1a1a]') : 'bg-transparent'}`}>
-                  {/* CSS vẽ hình tam giác */}
-                  <div className={`transition-all duration-400 w-0 h-0 border-l-[8px] border-r-[8px] border-b-[14px] border-l-transparent border-r-transparent border-b-[#fcbf49] bg-transparent ${activeTab === 'favorites' ? 'opacity-100 scale-100 -translate-y-[1px]' : 'opacity-0 scale-0'}`}></div>
+                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${activeTab === 'favorites' ? 'border-[#fcbf49] bg-[#fcbf49]' : (isDark ? 'border-white bg-transparent' : 'border-[#1a1a1a] bg-transparent')}`}>
+                  <span className={`text-sm transition-transform duration-300 ${activeTab === 'favorites' ? 'scale-110' : 'grayscale opacity-60 group-hover:opacity-100 group-hover:grayscale-0'}`}>❤️</span>
                 </div>
                 <span className={`text-[13px] md:text-[14px] font-black uppercase tracking-tight transition-colors duration-300 flex-1 text-left ${activeTab === 'favorites' ? 'text-[#fcbf49]' : (isDark ? 'text-white' : 'text-[#1a1a1a]')}`}>Yêu thích</span>
                 <span className={`text-xs font-mono opacity-60 font-bold ${activeTab === 'favorites' ? 'text-[#fcbf49]' : (isDark ? 'text-white' : 'text-[#1a1a1a]')}`}>{favorites.length}</span>
               </button>
 
-              {/* ITEM 5: THÙNG RÁC (HÌNH THOI HỒNG) */}
+              {/* ITEM 5: THÙNG RÁC */}
               <button 
                 onClick={(e) => { e.stopPropagation(); setActiveTab('trash'); setIsMobileMenuOpen(false); }} 
                 className="group flex items-center w-full cursor-pointer relative transition-transform duration-200 hover:translate-x-2"
               >
-                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${isDark ? 'border-white' : 'border-[#1a1a1a]'} ${activeTab === 'trash' ? (isDark ? 'bg-white' : 'bg-[#1a1a1a]') : 'bg-transparent'}`}>
-                  <div className={`transition-all duration-400 bg-[#ef476f] ${activeTab === 'trash' ? 'opacity-100 w-[14px] h-[14px] rotate-45' : 'opacity-0 w-0 h-0 rotate-0'}`}></div>
+                <div className={`w-8 h-8 shrink-0 border-[3px] flex items-center justify-center mr-4 transition-all duration-300 ${activeTab === 'trash' ? 'border-[#ef476f] bg-[#ef476f]' : (isDark ? 'border-white bg-transparent' : 'border-[#1a1a1a] bg-transparent')}`}>
+                  <span className={`text-sm transition-transform duration-300 ${activeTab === 'trash' ? 'scale-110' : 'grayscale opacity-60 group-hover:opacity-100 group-hover:grayscale-0'}`}>🗑️</span>
                 </div>
                 <span className={`text-[13px] md:text-[14px] font-black uppercase tracking-tight transition-colors duration-300 flex-1 text-left ${activeTab === 'trash' ? 'text-[#ef476f]' : (isDark ? 'text-white' : 'text-[#1a1a1a]')}`}>Thùng rác</span>
               </button>
